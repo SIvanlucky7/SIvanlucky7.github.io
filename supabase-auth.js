@@ -92,6 +92,15 @@ function authErrorMessage(error) {
 }
 
 const config = await loadConfig();
+const apiBaseIsCrossOrigin = (() => {
+  if (!config.apiBaseUrl) return false;
+  try {
+    return new URL(config.apiBaseUrl, window.location.origin).origin !== window.location.origin;
+  } catch {
+    return false;
+  }
+})();
+
 let supabase = null;
 const createSupabaseClient = window.supabase?.createClient;
 if (config.supabaseUrl && config.supabaseAnonKey && createSupabaseClient) {
@@ -165,7 +174,7 @@ window.fetch = async (input, init = {}) => {
 
 window.DaisyAuth = {
   configured: Boolean(supabase || config.localAuthAvailable),
-  provider: config.localAuthAvailable ? "local" : supabase ? "supabase" : "none",
+  provider: apiBaseIsCrossOrigin && supabase ? "supabase" : config.localAuthAvailable ? "local" : supabase ? "supabase" : "none",
   supabase,
   config,
   authErrorMessage,
@@ -173,8 +182,16 @@ window.DaisyAuth = {
   getUser,
   apiFetch,
   async signUp(email, password, redirectTo) {
+    if (supabase && apiBaseIsCrossOrigin) {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { emailRedirectTo: redirectTo },
+      });
+      if (error) throw new Error(authErrorMessage(error));
+      return { ...data, needsEmailConfirmation: !data.session };
+    }
     if (config.localAuthAvailable) {
-      if (!config.localAuthAvailable) throw new Error("认证服务未配置，请先启用 Supabase 或本地 API");
       const response = await nativeFetch(apiUrl("/api/register"), {
         method: "POST",
         credentials: config.apiBaseUrl ? "include" : "same-origin",

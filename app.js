@@ -20,6 +20,9 @@ const state = {
   originalFileName: "",
   lastDownloadUrl: "",
   lastOutputFilename: "",
+  sourceFileBase64: "",
+  originalFileBase64: "",
+  reportFileBase64: "",
   paymentPollTimer: null,
 };
 
@@ -30,9 +33,9 @@ const LANGUAGE_RATES = {
 };
 
 const serviceDescriptions = {
-  aigc: "支持中英文文本，调用 BypassAIGC 进行表达自然化和句式调整。",
+  aigc: "支持中英文文本，进行表达自然化和句式调整。",
   repeat: "适合重复率偏高的段落。系统会重组句式、替换表达，并尽量保留术语、引用和原意边界。",
-  combo: "先调用 BypassAIGC 降AI率，再进行重复表达优化。适合检测报告同时提示两类风险的文稿。",
+  combo: "调用 BypassAIGC 统一进行表达自然化和句式调整，适合同时需要降AI和降重的文稿。",
   custom: "适合检测结果复杂、格式要求严格或交付标准明确的文稿。提交需求后由客服确认报价和时间。",
 };
 
@@ -226,6 +229,8 @@ function quoteJob(text = sourceText.value.trim()) {
     inputType: state.input,
     sourceFilename: state.input === "report" ? state.originalFileName : state.input === "file" ? state.sourceFileName : "",
     reportFilename: state.input === "report" ? state.reportFileName : "",
+    sourceFileBase64: state.input === "file" ? state.sourceFileBase64 : state.input === "report" ? state.originalFileBase64 : "",
+    reportFileBase64: state.input === "report" ? state.reportFileBase64 : "",
   };
 }
 
@@ -368,17 +373,28 @@ fileInput.addEventListener("change", async () => {
   if (!file) return;
   await extractFileToText(file, {
     loadingText: `正在解析文件：${file.name}`,
-    onSuccess: (payload) => {
+    onSuccess: async (payload) => {
       sourceText.value = payload.text;
       state.sourceFileName = file.name;
+      state.sourceFileBase64 = await fileToBase64(file);
       showToast(payload.truncated ? `已提取前 ${payload.limit} 字，可分批处理全文。` : `已提取 ${payload.chars} 字`);
     },
     onError: () => {
       sourceText.value = "";
       state.sourceFileName = "";
+      state.sourceFileBase64 = "";
     },
   });
 });
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || "").split(",", 2)[1] || "");
+    reader.onerror = () => reject(reader.error || new Error("文件读取失败"));
+    reader.readAsDataURL(file);
+  });
+}
 
 async function extractFileToText(file, { loadingText = "", onSuccess, onError } = {}) {
   if (!(await ensureAuthenticated())) {
@@ -401,7 +417,7 @@ async function extractFileToText(file, { loadingText = "", onSuccess, onError } 
     });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error || "文件解析失败");
-    onSuccess?.(payload);
+    if (onSuccess) await onSuccess(payload);
     return payload;
   } catch (error) {
     onError?.(error);
@@ -424,11 +440,14 @@ function updateInputMode() {
     state.reportText = "";
     state.reportFileName = "";
     state.originalFileName = "";
+    state.reportFileBase64 = "";
+    state.originalFileBase64 = "";
     reportFileName.textContent = "点击或拖拽上传检测报告";
     originalFileName.textContent = "点击或拖拽上传原文文件";
   }
   if (state.input !== "file") {
     state.sourceFileName = "";
+    state.sourceFileBase64 = "";
   }
   updatePrice();
   createIconsSafe();
@@ -439,15 +458,17 @@ reportFileInput.addEventListener("change", async () => {
   if (!file) return;
   reportFileName.textContent = `正在解析：${file.name}`;
   const payload = await extractFileToText(file, {
-    onSuccess: (payload) => {
+    onSuccess: async (payload) => {
       state.reportText = payload.text;
       state.reportFileName = file.name;
+      state.reportFileBase64 = await fileToBase64(file);
       reportFileName.textContent = file.name;
       showToast(`检测报告已读取 ${payload.chars} 字`);
     },
     onError: () => {
       state.reportText = "";
       state.reportFileName = "";
+      state.reportFileBase64 = "";
       reportFileName.textContent = "点击或拖拽上传检测报告";
     },
   });
@@ -459,15 +480,17 @@ originalFileInput.addEventListener("change", async () => {
   if (!file) return;
   originalFileName.textContent = `正在解析：${file.name}`;
   const payload = await extractFileToText(file, {
-    onSuccess: (payload) => {
+    onSuccess: async (payload) => {
       sourceText.value = payload.text;
       state.originalFileName = file.name;
+      state.originalFileBase64 = await fileToBase64(file);
       originalFileName.textContent = file.name;
       showToast(payload.truncated ? `原文已提取前 ${payload.limit} 字，可分批处理。` : `原文已读取 ${payload.chars} 字`);
     },
     onError: () => {
       sourceText.value = "";
       state.originalFileName = "";
+      state.originalFileBase64 = "";
       originalFileName.textContent = "点击或拖拽上传原文文件";
     },
   });
@@ -481,9 +504,13 @@ function renderOrderConfirm(job) {
     <div class="confirm-row"><span>处理语言</span><strong>${escapeHtml(job.languageName)}</strong></div>
     ${job.inputType === "report" ? `<div class="confirm-row"><span>检测报告</span><strong>${escapeHtml(state.reportFileName || "-")}</strong></div>` : ""}
     ${job.inputType === "report" ? `<div class="confirm-row"><span>原文文件</span><strong>${escapeHtml(state.originalFileName || "-")}</strong></div>` : ""}
-    <div class="confirm-row"><span>文本字数</span><strong>${job.length} 字</strong></div>
-    <div class="confirm-row"><span>计费规则</span><strong>${job.length} 字 × ¥${job.unitPrice.toFixed(2)}/千字，按比例折算</strong></div>
-    <div class="confirm-row total"><span>本次扣费</span><strong>¥${job.amount.toFixed(2)}</strong></div>
+    ${job.inputType === "report"
+      ? `<div class="confirm-row"><span>原文字数</span><strong>${job.length} 字</strong></div>
+         <div class="confirm-row"><span>计费规则</span><strong>按报告红色/彩色标记命中的实际降AI文字扣费</strong></div>
+         <div class="confirm-row total"><span>最高预估</span><strong>¥${job.amount.toFixed(2)}</strong></div>`
+      : `<div class="confirm-row"><span>文本字数</span><strong>${job.length} 字</strong></div>
+         <div class="confirm-row"><span>计费规则</span><strong>${job.length} 字 × ¥${job.unitPrice.toFixed(2)}/千字，按比例折算</strong></div>
+         <div class="confirm-row total"><span>本次扣费</span><strong>¥${job.amount.toFixed(2)}</strong></div>`}
     <div class="confirm-row"><span>当前余额</span><strong>¥${state.balance.toFixed(2)}</strong></div>
   `;
 }
@@ -522,7 +549,7 @@ async function submitJob() {
     showToast("高级定制请提交工单，客服会确认报价和交付时间。");
     return;
   }
-  if (job.amount > state.balance) {
+  if (job.inputType !== "report" && job.amount > state.balance) {
     showToast("余额不足，请先充值。");
     openPaymentModal();
     return;
@@ -557,6 +584,8 @@ async function runOptimize(job) {
         source_filename: job.sourceFilename,
         report_filename: job.reportFilename,
         report_text: job.reportText,
+        source_file_base64: job.sourceFileBase64,
+        report_file_base64: job.reportFileBase64,
         text: job.text,
       }),
     });
@@ -568,7 +597,7 @@ async function runOptimize(job) {
     state.lastOutputFilename = payload.output_filename || "";
     downloadBtn.innerHTML = job.inputType === "text"
       ? '<i data-lucide="download"></i>导出 TXT'
-      : '<i data-lucide="download"></i>下载处理文件';
+      : '<i data-lucide="download"></i>导出 Word';
     state.balance = Number(payload.balance ?? Math.max(0, state.balance - price));
     closeOrderConfirmModal();
     updatePrice();
@@ -640,7 +669,7 @@ downloadBtn.addEventListener("click", async () => {
   if (!resultText.value) return;
   try {
     if (state.lastDownloadUrl) {
-      await downloadBlob(state.lastDownloadUrl, state.lastOutputFilename || `雏菊论文-${Date.now()}.txt`);
+      await downloadBlob(state.lastDownloadUrl, state.lastOutputFilename || `雏菊论文-${Date.now()}.docx`);
       return;
     }
     const blob = new Blob([resultText.value], { type: "text/plain;charset=utf-8" });
@@ -1327,7 +1356,7 @@ downloadOrderResultBtn.addEventListener("click", async () => {
   try {
     await downloadBlob(
       `/api/orders/${encodeURIComponent(state.selectedOrder.order_id)}/download`,
-      `雏菊论文-${state.selectedOrder.order_id}.txt`,
+      `雏菊论文-${state.selectedOrder.order_id}.docx`,
     );
   } catch (error) {
     showToast(error.message);
