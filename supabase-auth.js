@@ -165,7 +165,7 @@ window.fetch = async (input, init = {}) => {
 
 window.DaisyAuth = {
   configured: Boolean(supabase || config.localAuthAvailable),
-  provider: supabase ? "supabase" : config.localAuthAvailable ? "local" : "none",
+  provider: config.localAuthAvailable ? "local" : supabase ? "supabase" : "none",
   supabase,
   config,
   authErrorMessage,
@@ -173,7 +173,7 @@ window.DaisyAuth = {
   getUser,
   apiFetch,
   async signUp(email, password, redirectTo) {
-    if (!supabase) {
+    if (config.localAuthAvailable) {
       if (!config.localAuthAvailable) throw new Error("认证服务未配置，请先启用 Supabase 或本地 API");
       const response = await nativeFetch(apiUrl("/api/register"), {
         method: "POST",
@@ -189,13 +189,14 @@ window.DaisyAuth = {
         needsEmailConfirmation: false,
       };
     }
+    if (!supabase) throw new Error("Authentication service is not configured");
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { emailRedirectTo: redirectTo },
     });
     if (error) throw new Error(authErrorMessage(error));
-    return { ...data, needsEmailConfirmation: true };
+    return { ...data, needsEmailConfirmation: !data.session };
   },
   async signIn(email, password) {
     let supabaseError = null;
