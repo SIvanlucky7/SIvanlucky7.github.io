@@ -1,0 +1,210 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>雏菊AIGC - 后台管理</title>
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./styles.css?v=20260616-support" />
+    <script src="./icons.js"></script>
+  </head>
+  <body class="admin-body">
+    <header class="topbar">
+      <a class="brand" href="./index.html">
+        <span class="daisy-logo" aria-hidden="true">
+          <span class="petal p1"></span>
+          <span class="petal p2"></span>
+          <span class="petal p3"></span>
+          <span class="petal p4"></span>
+          <span class="petal p5"></span>
+          <span class="petal p6"></span>
+          <span class="core"></span>
+        </span>
+        <span>雏菊AIGC</span>
+      </a>
+      <nav class="nav">
+        <a href="./index.html">前台</a>
+        <a class="active" href="./admin.html">后台管理</a>
+        <a href="#ordersTable">订单</a>
+        <a href="#paymentsTable">充值</a>
+      </nav>
+      <button class="login" id="refreshAdmin" type="button">
+        <i data-lucide="refresh-cw"></i>
+        刷新
+      </button>
+    </header>
+
+    <main class="admin-shell">
+      <section class="admin-heading">
+        <div>
+          <h1>运营总览</h1>
+          <p>用户、订单、充值和资金流水的实时快照。</p>
+        </div>
+        <span id="adminUpdated">等待刷新</span>
+      </section>
+
+      <section class="admin-login-panel" id="adminLoginPanel" hidden>
+        <div>
+          <h2>管理员登录</h2>
+          <p>请输入后台管理员账号，普通用户无法查看运营数据。</p>
+        </div>
+        <form id="adminLoginForm" class="admin-login-form">
+          <label>
+            <span>邮箱</span>
+            <input id="adminEmail" type="email" autocomplete="username" value="admin@daisy.local" />
+          </label>
+          <label>
+            <span>密码</span>
+            <input id="adminPassword" type="password" autocomplete="current-password" placeholder="本地默认 admin123456" />
+          </label>
+          <button class="auth-submit" id="adminLoginBtn" type="submit">进入后台</button>
+        </form>
+      </section>
+
+      <div class="admin-content" id="adminContent" hidden>
+        <section class="metric-grid">
+          <article><span>用户数</span><strong id="metricUsers">0</strong></article>
+          <article><span>订单数</span><strong id="metricOrders">0</strong></article>
+          <article><span>充值收入</span><strong id="metricRevenue">¥0.00</strong></article>
+          <article><span>24小时 API</span><strong id="metricApiCalls">0</strong></article>
+        </section>
+
+        <section class="readiness-panel">
+          <div class="readiness-head">
+            <div>
+              <h2>上线检查</h2>
+              <p>阻塞项未清零前，不建议开放真实收费。</p>
+            </div>
+            <strong id="readinessStatus">检查中</strong>
+          </div>
+          <div class="readiness-grid" id="readinessGrid"></div>
+        </section>
+
+        <section class="admin-adjust-panel">
+          <div>
+            <h2>数据导出</h2>
+            <p>用于财务对账、客服追溯和定期备份；导出文件和数据库备份仅管理员可下载。</p>
+          </div>
+          <div class="export-actions">
+            <a class="table-action" href="/api/admin/export?type=orders">订单</a>
+            <a class="table-action" href="/api/admin/export?type=payments">支付</a>
+            <a class="table-action" href="/api/admin/export?type=ledger">资金流水</a>
+            <a class="table-action" href="/api/admin/export?type=api_usage">API 调用</a>
+            <a class="table-action" href="/api/admin/export?type=admin_audit">管理员审计</a>
+            <a class="table-action" href="/api/admin/export?type=support_tickets">客服工单</a>
+            <a class="table-action" href="/api/admin/export?type=users">用户</a>
+            <a class="table-action" href="/api/admin/backup-db">数据库备份</a>
+            <button class="table-action danger-action" id="cleanupResultsBtn" type="button">清理旧结果</button>
+          </div>
+        </section>
+
+        <section class="admin-adjust-panel">
+          <div>
+            <h2>余额调整</h2>
+            <p>用于退款、异常扣费修正或客服补偿；每次操作都会写入资金流水。</p>
+          </div>
+          <form id="adjustForm" class="admin-adjust-form">
+            <label>
+              <span>用户邮箱</span>
+              <input id="adjustEmail" type="email" placeholder="user@example.com" />
+            </label>
+            <label>
+              <span>金额（元）</span>
+              <input id="adjustAmount" type="number" step="0.01" placeholder="正数补款，负数扣减" />
+            </label>
+            <label>
+              <span>备注</span>
+              <input id="adjustNote" type="text" maxlength="120" placeholder="退款/补偿/异常修正原因" />
+            </label>
+            <button class="auth-submit" id="adjustSubmit" type="submit">提交调整</button>
+          </form>
+        </section>
+
+        <section class="admin-adjust-panel">
+          <div>
+            <h2>支付入账</h2>
+            <p>用于真实支付回调异常、线下转账或人工核销；确认后会给用户到账并写入审计。</p>
+          </div>
+          <form id="confirmPaymentForm" class="admin-adjust-form">
+            <label>
+              <span>支付单号</span>
+              <input id="confirmPaymentId" type="text" placeholder="点击待支付单自动填入" />
+            </label>
+            <label>
+              <span>交易号</span>
+              <input id="confirmTradeNo" type="text" maxlength="80" placeholder="支付平台交易号/线下凭证号" />
+            </label>
+            <label>
+              <span>备注</span>
+              <input id="confirmPaymentNote" type="text" maxlength="120" placeholder="支付平台异常补入/线下收款核销" />
+            </label>
+            <button class="auth-submit" id="confirmPaymentSubmit" type="submit">确认入账</button>
+          </form>
+        </section>
+
+        <section class="admin-grid">
+          <article class="admin-table-card" id="usersTable">
+            <div class="card-head"><h2>最近用户</h2></div>
+            <table>
+              <thead><tr><th>邮箱</th><th>余额</th><th>注册时间</th><th>操作</th></tr></thead>
+              <tbody id="usersBody"></tbody>
+            </table>
+          </article>
+
+          <article class="admin-table-card" id="paymentsTable">
+            <div class="card-head"><h2>最近充值</h2></div>
+            <table>
+              <thead><tr><th>支付单</th><th>用户</th><th>应付金额</th><th>用户填报</th><th>状态</th><th>用户凭证</th><th>提交时间</th><th>平台交易号</th><th>操作</th></tr></thead>
+              <tbody id="paymentsBody"></tbody>
+            </table>
+          </article>
+
+          <article class="admin-table-card wide" id="ordersTable">
+            <div class="card-head"><h2>最近订单</h2></div>
+            <table>
+              <thead><tr><th>订单</th><th>服务</th><th>字数</th><th>金额</th><th>引擎</th><th>状态</th></tr></thead>
+              <tbody id="ordersBody"></tbody>
+            </table>
+          </article>
+
+          <article class="admin-table-card wide">
+            <div class="card-head"><h2>资金流水</h2></div>
+            <table>
+              <thead><tr><th>ID</th><th>类型</th><th>金额</th><th>余额后</th><th>关联单号</th><th>备注</th></tr></thead>
+              <tbody id="ledgerBody"></tbody>
+            </table>
+          </article>
+
+          <article class="admin-table-card wide">
+            <div class="card-head"><h2>最近工单</h2></div>
+            <table>
+              <thead><tr><th>工单</th><th>邮箱</th><th>类型</th><th>标题</th><th>状态</th><th>关联单号</th><th>客服备注</th><th>操作</th></tr></thead>
+              <tbody id="supportTicketsBody"></tbody>
+            </table>
+          </article>
+
+          <article class="admin-table-card wide">
+            <div class="card-head"><h2>管理员审计</h2></div>
+            <table>
+              <thead><tr><th>ID</th><th>管理员</th><th>动作</th><th>对象</th><th>金额</th><th>关联单号</th><th>来源 IP</th><th>备注</th></tr></thead>
+              <tbody id="adminAuditBody"></tbody>
+            </table>
+          </article>
+
+          <article class="admin-table-card wide">
+            <div class="card-head"><h2>最近 API 调用</h2></div>
+            <table>
+              <thead><tr><th>ID</th><th>账号</th><th>Key</th><th>状态</th><th>字数</th><th>金额</th><th>订单</th><th>错误</th></tr></thead>
+              <tbody id="apiUsageBody"></tbody>
+            </table>
+          </article>
+        </section>
+      </div>
+    </main>
+
+    <div class="toast" id="toast"></div>
+    <script src="/vendor/supabase.js?v=20260617"></script>
+    <script type="module" src="/supabase-auth.js?v=20260618-hybrid-auth"></script>
+    <script type="module" src="./admin.js?v=20260618-auth-flow"></script>
+  </body>
+</html>

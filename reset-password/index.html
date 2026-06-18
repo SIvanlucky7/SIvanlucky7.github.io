@@ -1,0 +1,52 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>重置密码 - 雏菊论文</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/styles.css?v=20260617-supabase-auth" />
+    <script src="/icons.js"></script>
+  </head>
+  <body data-auth-page="reset-password">
+    <header class="topbar">
+      <a class="brand" href="/">
+        <span class="daisy-logo" aria-hidden="true">
+          <span class="petal p1"></span><span class="petal p2"></span><span class="petal p3"></span>
+          <span class="petal p4"></span><span class="petal p5"></span><span class="petal p6"></span><span class="core"></span>
+        </span>
+        <span>雏菊论文</span>
+      </a>
+      <nav class="nav">
+        <a href="/">在线处理</a>
+        <a href="/login">登录</a>
+      </nav>
+    </header>
+    <main class="auth-page">
+      <section class="auth-shell">
+        <div class="auth-copy">
+          <span class="hero-badge">设置新密码</span>
+          <h1>完成密码重置</h1>
+          <p>请从邮箱里的重置链接打开本页，然后设置新的登录密码。</p>
+        </div>
+        <form class="auth-card-page" data-auth-form novalidate>
+          <h2>重置密码</h2>
+          <p>新密码保存后，可直接进入用户中心。</p>
+          <div class="auth-alert" data-auth-message hidden></div>
+          <label class="auth-field">
+            <span>新密码</span>
+            <input name="password" type="password" autocomplete="new-password" placeholder="至少 8 位" />
+          </label>
+          <label class="auth-field">
+            <span>确认新密码</span>
+            <input name="confirm_password" type="password" autocomplete="new-password" placeholder="再次输入新密码" />
+          </label>
+          <button class="auth-submit" data-auth-submit type="submit">保存新密码</button>
+        </form>
+      </section>
+    </main>
+    <script src="/vendor/supabase.js?v=20260617"></script>
+    <script type="module" src="/supabase-auth.js?v=20260617-local-auth"></script>
+    <script type="module" src="/auth-pages.js?v=20260617-redirect-fix"></script>
+  </body>
+</html>

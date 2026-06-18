@@ -1,0 +1,495 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>雏菊论文 - AIGC与降重处理工具</title>
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./styles.css?v=20260617-image-logo" />
+    <script src="./icons.js?v=20260617-icons3"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="#">
+        <span class="daisy-logo" aria-hidden="true">
+          <span class="petal p1"></span>
+          <span class="petal p2"></span>
+          <span class="petal p3"></span>
+          <span class="petal p4"></span>
+          <span class="petal p5"></span>
+          <span class="petal p6"></span>
+          <span class="core"></span>
+        </span>
+        <span>雏菊论文</span>
+      </a>
+      <nav class="nav">
+        <a class="active" href="#workspace">降重/降AI率</a>
+        <a href="#pricing">充值</a>
+        <a href="#api" data-help-trigger="api">API 服务</a>
+        <a href="#orders" data-orders-trigger>订单</a>
+        <a href="#support" data-help-trigger="contact">客服</a>
+        <a href="./admin.html">后台</a>
+      </nav>
+      <section class="wallet top-wallet" id="pricing">
+        <div>
+          <span>余额：</span>
+          <strong id="balance">¥ 36.80</strong>
+        </div>
+        <button id="rechargeBtn">充值</button>
+      </section>
+      <button class="login" id="loginBtn" type="button">登录 / 注册</button>
+      <button class="login secondary" id="accountBtn" type="button" hidden>用户中心</button>
+      <button class="login secondary" id="logoutBtn" type="button" hidden>退出</button>
+    </header>
+
+    <main id="workspace" class="workspace">
+      <aside class="service-panel">
+        <div class="panel-title">选择服务</div>
+        <button class="service-card active" data-service="aigc" data-rate="1" data-title="降AI率">
+          <i data-lucide="sparkles"></i>
+          <span>
+            <strong>降AI率</strong>
+            <small>1元/1000字</small>
+          </span>
+          <em>全网最低</em>
+        </button>
+        <button class="service-card" data-service="repeat" data-rate="1" data-title="降重复率">
+          <i data-lucide="file-text"></i>
+          <span>
+            <strong>降重复率</strong>
+            <small>1元/1000字</small>
+          </span>
+        </button>
+        <button class="service-card" data-service="combo" data-rate="1.8" data-title="降AI+降重">
+          <i data-lucide="star"></i>
+          <span>
+            <strong>降AI+降重</strong>
+            <small>1.8元/1000字</small>
+          </span>
+        </button>
+        <button class="service-card" data-service="custom" data-rate="0" data-title="高级定制">
+          <i data-lucide="headphones"></i>
+          <span>
+            <strong>高级定制</strong>
+            <small>联系客服报价</small>
+          </span>
+          <em>专业</em>
+        </button>
+      </aside>
+
+      <section class="main-panel">
+        <section class="tool-hero">
+          <div>
+            <span class="hero-badge">降重/降AI率 · 一键处理</span>
+            <h1>选择服务，粘贴正文，立即生成处理结果</h1>
+            <p>支持中文、英文和检测报告场景；文本、文件、报告三种入口统一计费，订单和结果可追踪。</p>
+          </div>
+          <div class="hero-metrics">
+            <span><strong>1元</strong><small>千字起</small></span>
+            <span><strong>6000</strong><small>单次字符</small></span>
+            <span><strong>记录</strong><small>订单留存</small></span>
+          </div>
+        </section>
+
+        <div class="notice">
+          <i data-lucide="bell"></i>
+          <span><strong>核心引擎升级：</strong>已预留知网 / 维普 / 通用平台 / 格子达 / 朱雀平台配置入口，请按你的授权服务接入。</span>
+        </div>
+
+        <section class="config">
+          <div class="config-heading">
+            <h1 id="modeTitle">降AI率</h1>
+            <p id="modeDesc">支持中英文文本，调用 BypassAIGC 进行表达自然化和句式调整。</p>
+          </div>
+
+          <div class="controls">
+            <label>
+              <span>语言</span>
+              <select id="language">
+                <option value="zh">中文 (1元/千字)</option>
+                <option value="en">英文 (2元/千字)</option>
+              </select>
+            </label>
+
+            <fieldset>
+              <legend>检测平台</legend>
+              <button class="chip active" data-platform="cnki">知网</button>
+              <button class="chip" data-platform="weipu">维普</button>
+              <button class="chip" data-platform="general">通用平台</button>
+              <button class="chip" data-platform="gecida">格子达(学生版)</button>
+              <button class="chip" data-platform="zhuque">朱雀平台</button>
+              <button class="chip" data-platform="huachen">华宸</button>
+            </fieldset>
+
+            <fieldset>
+              <legend>输入类型</legend>
+              <button class="chip active" data-input="text"><i data-lucide="pencil-line"></i>文本</button>
+              <button class="chip" data-input="file"><i data-lucide="folder-open"></i>文件</button>
+              <button class="chip" data-input="report"><i data-lucide="clipboard-list"></i>报告</button>
+            </fieldset>
+          </div>
+        </section>
+
+        <section class="editor-grid">
+          <article class="editor-card">
+            <div class="card-head">
+              <h2>输入内容</h2>
+              <button class="ghost" id="sampleBtn"><i data-lucide="copy-plus"></i>示例</button>
+            </div>
+            <div class="drop-zone" id="dropZone">
+              <i data-lucide="upload-cloud"></i>
+              <span>拖拽文件到这里，或选择 TXT/DOCX/PDF</span>
+              <input id="fileInput" type="file" accept=".txt,.doc,.docx,.pdf" />
+            </div>
+            <div class="report-upload-panel" id="reportUploadPanel" hidden>
+              <div class="report-tip"><i data-lucide="circle-help"></i> 基于报告中标记的问题段落，针对性改写原文。</div>
+              <label class="report-file-field">
+                <span>检测报告 <b>*</b></span>
+                <div class="report-drop-card">
+                  <i data-lucide="clipboard-list"></i>
+                  <strong id="reportFileName">点击或拖拽上传检测报告</strong>
+                  <small>仅支持 .docx · 最大 15MB</small>
+                  <input id="reportFileInput" type="file" accept=".docx" />
+                </div>
+              </label>
+              <label class="report-file-field">
+                <span>原文文件 <b>*</b></span>
+                <div class="report-drop-card">
+                  <i data-lucide="file-text"></i>
+                  <strong id="originalFileName">点击或拖拽上传原文文件</strong>
+                  <small>仅支持 .docx · 最大 15MB</small>
+                  <input id="originalFileInput" type="file" accept=".docx" />
+                </div>
+              </label>
+            </div>
+            <textarea id="sourceText" placeholder="请输入需要处理的文本内容..."></textarea>
+            <div class="editor-footer">
+              <span id="count">总字符数：0/6000</span>
+              <span id="cost">预计费用：¥0.00，按实际字数折算</span>
+            </div>
+          </article>
+
+          <div class="submit-column">
+            <button class="submit" id="submitBtn" type="button">
+              <i data-lucide="arrow-right"></i>
+              提交
+            </button>
+            <div class="steps">
+              <span id="stepQueue">排队</span>
+              <span id="stepProcess">处理</span>
+              <span id="stepExport">结果</span>
+            </div>
+          </div>
+
+          <article class="editor-card result-card">
+            <div class="card-head">
+              <h2>处理结果</h2>
+              <button class="ghost" id="copyBtn"><i data-lucide="clipboard-copy"></i>复制</button>
+            </div>
+            <textarea id="resultText" placeholder="处理结果将在这里显示，可直接编辑、选择或删除"></textarea>
+            <div class="result-empty" id="resultEmpty" hidden>
+              <i data-lucide="file-text"></i>
+              <strong>上传文件并点击提交开始处理</strong>
+              <span>处理结果将在这里显示</span>
+            </div>
+            <div class="result-actions">
+              <button id="downloadBtn"><i data-lucide="download"></i>导出 TXT</button>
+              <button id="clearResultBtn" class="danger-inline"><i data-lucide="trash-2"></i>清空结果</button>
+            </div>
+          </article>
+        </section>
+      </section>
+
+      <aside class="support-rail" id="support">
+        <button title="生成记录" id="orders" data-orders-trigger><i data-lucide="receipt-text"></i><span>生成记录</span></button>
+        <button title="常见问题" data-help-trigger="faq"><i data-lucide="circle-help"></i><span>常见问题</span></button>
+        <button title="反馈" data-help-trigger="contact"><i data-lucide="message-square"></i><span>吐槽我吧</span></button>
+        <button title="联系客服" data-help-trigger="contact"><i data-lucide="headset"></i><span>联系客服</span></button>
+        <button class="rail-promo" title="测一测你需要?"><i data-lucide="sparkles"></i><span>测一测<br />你需要?</span></button>
+      </aside>
+    </main>
+
+    <section class="business-strip">
+      <div>
+        <strong>处理闭环</strong>
+        <span>字数计费、订单记录、余额扣费、接口转发、失败重试和结果导出已在同一工作台串联。</span>
+      </div>
+      <div>
+        <strong>使用提醒</strong>
+        <span>请处理你有权使用的公开或自有文本；重要论文、报告仍建议人工复核后再提交。</span>
+      </div>
+    </section>
+
+    <footer>
+      <a href="./about.html">关于我们</a>
+      <a href="./contact.html">联系我们</a>
+      <a href="./privacy.html">隐私政策</a>
+      <a href="./terms.html">用户协议</a>
+      <a href="./refund.html">退款规则</a>
+      <a href="./disclaimer.html">免责声明</a>
+      <span>© 2026 雏菊论文</span>
+    </footer>
+
+    <div class="toast" id="toast"></div>
+    <div class="modal-backdrop" id="helpModal" hidden>
+      <section class="help-dialog" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+        <button class="modal-close" id="helpClose" aria-label="关闭">×</button>
+        <div class="auth-mark">
+          <span class="daisy-logo small" aria-hidden="true">
+            <span class="petal p1"></span>
+            <span class="petal p2"></span>
+            <span class="petal p3"></span>
+            <span class="petal p4"></span>
+            <span class="petal p5"></span>
+            <span class="petal p6"></span>
+            <span class="core"></span>
+          </span>
+          <div>
+            <h2 id="helpTitle">帮助中心</h2>
+            <p id="helpSubtitle">常见问题、客服和 API 接入说明。</p>
+          </div>
+        </div>
+        <div class="help-content" id="helpContent"></div>
+      </section>
+    </div>
+    <div class="modal-backdrop" id="ordersModal" hidden>
+      <section class="orders-dialog" role="dialog" aria-modal="true" aria-labelledby="ordersTitle">
+        <button class="modal-close" id="ordersClose" aria-label="关闭">×</button>
+        <div class="auth-mark">
+          <span class="daisy-logo small" aria-hidden="true">
+            <span class="petal p1"></span>
+            <span class="petal p2"></span>
+            <span class="petal p3"></span>
+            <span class="petal p4"></span>
+            <span class="petal p5"></span>
+            <span class="petal p6"></span>
+            <span class="core"></span>
+          </span>
+          <div>
+            <h2 id="ordersTitle">订单中心</h2>
+            <p>查看最近处理记录，已完成订单可重新载入或下载结果。</p>
+          </div>
+        </div>
+        <div class="orders-layout">
+          <div class="orders-list" id="ordersList"></div>
+          <div class="order-detail">
+            <div id="orderDetailMeta">选择一条订单查看详情</div>
+            <textarea id="orderDetailResult" readonly placeholder="订单结果将在这里显示"></textarea>
+            <div class="result-actions">
+              <button id="loadOrderResultBtn" disabled><i data-lucide="panel-right-open"></i>载入结果</button>
+              <button id="downloadOrderResultBtn" disabled><i data-lucide="download"></i>下载</button>
+              <button id="copyOrderResultBtn" disabled><i data-lucide="clipboard-copy"></i>复制</button>
+              <button class="danger-inline" id="deleteOrderResultBtn" disabled><i data-lucide="trash-2"></i>删除结果</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+    <div class="modal-backdrop" id="orderConfirmModal" hidden>
+      <section class="auth-dialog order-confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="orderConfirmTitle">
+        <button class="modal-close" id="orderConfirmClose" aria-label="关闭">×</button>
+        <div class="auth-mark">
+          <span class="daisy-logo small" aria-hidden="true">
+            <span class="petal p1"></span>
+            <span class="petal p2"></span>
+            <span class="petal p3"></span>
+            <span class="petal p4"></span>
+            <span class="petal p5"></span>
+            <span class="petal p6"></span>
+            <span class="core"></span>
+          </span>
+          <div>
+            <h2 id="orderConfirmTitle">确认订单</h2>
+            <p>确认后系统将立即扣除余额并开始处理文本。</p>
+          </div>
+        </div>
+        <div class="order-confirm-summary" id="orderConfirmSummary"></div>
+        <p class="order-confirm-note">请确认文本已按要求脱敏。系统会按订单保存处理结果，用户可在订单中心删除结果内容。</p>
+        <div class="order-confirm-actions">
+          <button class="secondary-action" id="orderCancelBtn" type="button">取消</button>
+          <button class="auth-submit" id="confirmOrderBtn" type="button">确认并处理</button>
+        </div>
+      </section>
+    </div>
+    <div class="modal-backdrop" id="paymentModal" hidden>
+      <section class="auth-dialog payment-dialog" role="dialog" aria-modal="true" aria-labelledby="paymentTitle">
+        <button class="modal-close" id="paymentClose" aria-label="关闭">×</button>
+        <div class="auth-mark">
+          <span class="daisy-logo small" aria-hidden="true">
+            <span class="petal p1"></span>
+            <span class="petal p2"></span>
+            <span class="petal p3"></span>
+            <span class="petal p4"></span>
+            <span class="petal p5"></span>
+            <span class="petal p6"></span>
+            <span class="core"></span>
+          </span>
+          <div>
+            <h2 id="paymentTitle">账户充值</h2>
+            <p>三步完成充值：选金额、创建支付单、扫码后提交凭证。管理员核账后余额入账。</p>
+          </div>
+        </div>
+        <ol class="payment-steps" aria-label="充值步骤">
+          <li id="paymentStepAmount" class="active"><span>1</span><strong>选金额</strong></li>
+          <li id="paymentStepPay"><span>2</span><strong>扫码付款</strong></li>
+          <li id="paymentStepReview"><span>3</span><strong>等待核账</strong></li>
+        </ol>
+        <div class="payment-layout">
+          <section class="payment-section payment-amount-section">
+            <div class="payment-section-head">
+              <strong>选择金额</strong>
+              <small>余额可用于降重、降 AI、组合处理和 API 调用</small>
+            </div>
+            <div class="payment-packages">
+              <button data-pay-amount="10">¥10</button>
+              <button data-pay-amount="30">¥30</button>
+              <button class="active" data-pay-amount="50">¥50</button>
+              <button data-pay-amount="100">¥100</button>
+              <button data-pay-amount="200">¥200</button>
+            </div>
+            <button class="auth-submit" id="createPaymentBtn">创建支付单</button>
+            <button class="auth-submit secondary-action" id="confirmPaymentBtn" disabled>演示环境：确认到账</button>
+          </section>
+          <section class="payment-card" aria-live="polite">
+            <div class="payment-card-head">
+              <span>支付单状态</span>
+              <b class="payment-status-badge idle" id="paymentStatusBadge">未创建</b>
+            </div>
+            <div class="payment-summary-row">
+              <span>账户余额</span>
+              <strong id="paymentCurrentBalance">¥0.00</strong>
+            </div>
+            <div class="payment-summary-row">
+              <span>本次充值</span>
+              <strong id="paymentSelectedAmount">¥50.00</strong>
+            </div>
+            <div class="payment-summary-row">
+              <span>支付单号</span>
+              <strong id="paymentOrder">未创建</strong>
+            </div>
+            <small id="paymentHint">选择金额后点击创建支付单，再按页面提示扫码付款。</small>
+          </section>
+        </div>
+        <div class="payment-manual" id="paymentManual" hidden>
+          <div class="payment-qr-panel">
+            <span>扫码付款</span>
+            <img id="paymentQrImage" alt="收款二维码" hidden />
+            <small>付款金额必须与支付单一致</small>
+          </div>
+          <div class="payment-proof-panel">
+            <div class="payment-reference-line">
+              <div>
+                <span>付款备注（必须填写）</span>
+                <strong id="paymentReference">创建支付单后生成</strong>
+                <small id="paymentAccount">请按页面提示完成付款，付款备注务必填写支付单号</small>
+              </div>
+              <button class="secondary-action mini-action" id="copyPaymentRefBtn" type="button">复制</button>
+            </div>
+            <ul class="payment-checklist">
+              <li>扫码付款时，备注请填写上方支付单号。</li>
+              <li>付款完成后，填写实际付款金额和交易号。</li>
+              <li>提交审核后请勿重复创建同金额支付单。</li>
+            </ul>
+            <label class="payment-proof-field">
+              <span>实际付款金额</span>
+              <input id="paymentClaimedAmount" type="number" min="0.01" max="5000" step="0.01" inputmode="decimal" placeholder="例如 50.00" />
+            </label>
+            <label class="payment-proof-field">
+              <span>付款交易号</span>
+              <input id="paymentTradeNo" type="text" maxlength="80" placeholder="填写支付宝交易号或订单号" />
+            </label>
+            <label class="payment-proof-field">
+              <span>补充备注</span>
+              <input id="paymentNotifyNote" type="text" maxlength="160" placeholder="如付款账户名、转账时间、截图说明" />
+            </label>
+            <button class="auth-submit mini-submit" id="submitPaymentNoticeBtn" type="button">我已付款，提交审核</button>
+          </div>
+        </div>
+        <div class="payment-history">
+          <div class="payment-history-head">
+            <strong>充值记录</strong>
+            <button class="secondary-action mini-action" id="refreshPaymentsBtn" type="button">刷新</button>
+          </div>
+          <div class="payment-history-list" id="paymentHistoryList">打开后自动读取</div>
+        </div>
+      </section>
+    </div>
+    <div class="modal-backdrop" id="authModal" hidden>
+      <section class="auth-dialog" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+        <button class="modal-close" id="authClose" aria-label="关闭">×</button>
+        <div class="auth-mark">
+          <span class="daisy-logo small" aria-hidden="true">
+            <span class="petal p1"></span>
+            <span class="petal p2"></span>
+            <span class="petal p3"></span>
+            <span class="petal p4"></span>
+            <span class="petal p5"></span>
+            <span class="petal p6"></span>
+            <span class="core"></span>
+          </span>
+          <div>
+            <h2 id="authTitle">登录雏菊AIGC</h2>
+            <p>登录后余额、订单和处理记录会按账号保存。</p>
+          </div>
+        </div>
+        <div class="auth-tabs">
+          <button class="active" id="loginTab">登录</button>
+          <button id="registerTab">注册</button>
+        </div>
+        <form id="authForm">
+          <label class="auth-field">
+            <span>邮箱</span>
+            <input id="authEmail" type="email" autocomplete="email" placeholder="you@example.com" />
+          </label>
+          <label class="auth-field">
+            <span>密码</span>
+            <input id="authPassword" type="password" autocomplete="current-password" placeholder="至少 6 位" />
+          </label>
+          <label class="terms-check" id="termsCheck" hidden>
+            <input id="acceptTerms" type="checkbox" />
+            <span>我已阅读并同意 <a href="./terms.html" target="_blank" rel="noopener">用户协议</a> 和 <a href="./privacy.html" target="_blank" rel="noopener">隐私政策</a></span>
+          </label>
+          <button class="auth-submit" id="authSubmit" type="submit">登录</button>
+        </form>
+      </section>
+    </div>
+    <div class="modal-backdrop" id="accountModal" hidden>
+      <section class="auth-dialog" role="dialog" aria-modal="true" aria-labelledby="accountTitle">
+        <button class="modal-close" id="accountClose" aria-label="关闭">×</button>
+        <div class="auth-mark">
+          <span class="daisy-logo small" aria-hidden="true">
+            <span class="petal p1"></span>
+            <span class="petal p2"></span>
+            <span class="petal p3"></span>
+            <span class="petal p4"></span>
+            <span class="petal p5"></span>
+            <span class="petal p6"></span>
+            <span class="core"></span>
+          </span>
+          <div>
+            <h2 id="accountTitle">账号安全</h2>
+            <p>修改密码后，其他设备上的登录状态会失效。</p>
+          </div>
+        </div>
+        <form id="passwordForm">
+          <label class="auth-field">
+            <span>当前密码</span>
+            <input id="currentPassword" type="password" autocomplete="current-password" />
+          </label>
+          <label class="auth-field">
+            <span>新密码</span>
+            <input id="newPassword" type="password" autocomplete="new-password" placeholder="至少 8 位" />
+          </label>
+          <label class="auth-field">
+            <span>确认新密码</span>
+            <input id="confirmNewPassword" type="password" autocomplete="new-password" />
+          </label>
+          <button class="auth-submit" id="passwordSubmit" type="submit">修改密码</button>
+        </form>
+      </section>
+    </div>
+    <script src="/vendor/supabase.js?v=20260617"></script>
+    <script type="module" src="/supabase-auth.js?v=20260617-local-auth"></script>
+    <script src="./app.js?v=20260618-payment-flow"></script>
+  </body>
+</html>

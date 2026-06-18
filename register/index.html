@@ -1,0 +1,61 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>注册 - 雏菊论文</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/styles.css?v=20260617-supabase-auth" />
+    <script src="/icons.js"></script>
+  </head>
+  <body data-auth-page="register">
+    <header class="topbar">
+      <a class="brand" href="/">
+        <span class="daisy-logo" aria-hidden="true">
+          <span class="petal p1"></span><span class="petal p2"></span><span class="petal p3"></span>
+          <span class="petal p4"></span><span class="petal p5"></span><span class="petal p6"></span><span class="core"></span>
+        </span>
+        <span>雏菊论文</span>
+      </a>
+      <nav class="nav">
+        <a href="/">在线处理</a>
+        <a href="/login">登录</a>
+        <a class="active" href="/register">注册</a>
+      </nav>
+    </header>
+    <main class="auth-page">
+      <section class="auth-shell">
+        <div class="auth-copy">
+          <span class="hero-badge">创建邮箱账号</span>
+          <h1>注册后即可保存订单记录</h1>
+          <p>本地部署可直接创建账号；生产接入 Supabase 后可启用邮箱验证。</p>
+        </div>
+        <form class="auth-card-page" data-auth-form novalidate>
+          <h2>注册账号</h2>
+          <p>密码建议包含字母、数字或符号。</p>
+          <div class="auth-alert" data-auth-message hidden></div>
+          <label class="auth-field">
+            <span>邮箱</span>
+            <input name="email" type="email" autocomplete="email" placeholder="you@example.com" />
+          </label>
+          <label class="auth-field">
+            <span>密码</span>
+            <input name="password" type="password" autocomplete="new-password" placeholder="至少 8 位" />
+          </label>
+          <label class="auth-field">
+            <span>确认密码</span>
+            <input name="confirm_password" type="password" autocomplete="new-password" placeholder="再次输入密码" />
+          </label>
+          <p class="auth-terms">注册即表示同意 <a href="/terms.html" target="_blank" rel="noopener">用户协议</a> 和 <a href="/privacy.html" target="_blank" rel="noopener">隐私政策</a>。</p>
+          <button class="auth-submit" data-auth-submit type="submit">注册</button>
+          <div class="auth-foot-links">
+            <a data-auth-link href="/login">已有账号，去登录</a>
+          </div>
+        </form>
+      </section>
+    </main>
+    <script src="/vendor/supabase.js?v=20260617"></script>
+    <script type="module" src="/supabase-auth.js?v=20260617-local-auth"></script>
+    <script type="module" src="/auth-pages.js?v=20260617-redirect-fix"></script>
+  </body>
+</html>
