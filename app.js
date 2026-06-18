@@ -253,7 +253,10 @@ function updatePrice() {
 
 async function refreshPublicConfig() {
   try {
-    const response = await fetch("/api/public-config");
+    const auth = await waitForDaisyAuth();
+    const response = auth?.apiFetch
+      ? await auth.apiFetch("/api/public-config")
+      : await fetch("/api/public-config");
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error || "配置读取失败");
     state.mockPaymentsEnabled = Boolean(payload.mock_payments_enabled);
