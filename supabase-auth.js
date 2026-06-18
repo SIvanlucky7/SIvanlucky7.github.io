@@ -80,6 +80,10 @@ function authErrorMessage(error) {
   const message = String(error?.message || error || "");
   const lower = message.toLowerCase();
   if (!message) return "操作失败，请稍后再试";
+  if (lower.includes("supabase no-email signup is not configured")) return "免邮箱验证注册还未配置：请在 Vercel 后端环境变量添加 SUPABASE_SERVICE_ROLE_KEY，或在 Supabase 关闭邮箱确认";
+  if (lower.includes("supabase no-email login bootstrap is not configured")) return "免邮箱验证登录补齐还未配置：请在 Vercel 后端环境变量添加 SUPABASE_SERVICE_ROLE_KEY";
+  if (lower.includes("supabase no-email signup failed")) return "Supabase 免验证注册失败，请检查 service_role 密钥和 Supabase 项目设置";
+  if (lower.includes("supabase no-email login bootstrap failed")) return "Supabase 账号补齐失败，请检查 service_role 密钥和 Supabase 项目设置";
   if (lower.includes("invalid login credentials")) return "邮箱或密码错误";
   if (lower.includes("email not confirmed")) return "请先打开邮箱完成验证";
   if (lower.includes("user already registered") || lower.includes("already registered")) return "该邮箱已注册，请直接登录";
@@ -183,13 +187,24 @@ window.DaisyAuth = {
   apiFetch,
   async signUp(email, password, redirectTo) {
     if (supabase && apiBaseIsCrossOrigin) {
-      const { data, error } = await supabase.auth.signUp({
+      if (config.localAuthAvailable) {
+        const response = await nativeFetch(apiUrl("/api/register"), {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password, accept_terms: true, require_supabase_admin: true }),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(authErrorMessage(payload.error || "注册失败"));
+        }
+      }
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
-        options: { emailRedirectTo: redirectTo },
       });
       if (error) throw new Error(authErrorMessage(error));
-      return { ...data, needsEmailConfirmation: !data.session };
+      return { ...data, needsEmailConfirmation: false };
     }
     if (config.localAuthAvailable) {
       const response = await nativeFetch(apiUrl("/api/register"), {
@@ -221,7 +236,24 @@ window.DaisyAuth = {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (!error) return data;
       supabaseError = error;
-      if (apiBaseIsCrossOrigin) throw new Error(authErrorMessage(error));
+      if (apiBaseIsCrossOrigin) {
+        if (config.localAuthAvailable) {
+          const response = await nativeFetch(apiUrl("/api/login"), {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password, require_supabase_admin: true }),
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(authErrorMessage(payload.error || error));
+          }
+          const retry = await supabase.auth.signInWithPassword({ email, password });
+          if (!retry.error) return retry.data;
+          throw new Error(authErrorMessage(retry.error));
+        }
+        throw new Error(authErrorMessage(error));
+      }
     }
     if (!config.localAuthAvailable) throw new Error(authErrorMessage(supabaseError || "登录失败"));
     const response = await nativeFetch(apiUrl("/api/login"), {
