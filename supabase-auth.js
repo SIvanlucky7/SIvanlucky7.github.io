@@ -134,7 +134,7 @@ async function getSession() {
     if (error) throw new Error(authErrorMessage(error));
     if (data.session) return data.session;
   }
-  if (!config.localAuthAvailable) return null;
+  if (!config.localAuthAvailable || apiBaseIsCrossOrigin) return null;
   const response = await nativeFetch(apiUrl("/api/me"), {
     cache: "no-store",
     credentials: config.apiBaseUrl ? "include" : "same-origin",
@@ -221,6 +221,7 @@ window.DaisyAuth = {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (!error) return data;
       supabaseError = error;
+      if (apiBaseIsCrossOrigin) throw new Error(authErrorMessage(error));
     }
     if (!config.localAuthAvailable) throw new Error(authErrorMessage(supabaseError || "登录失败"));
     const response = await nativeFetch(apiUrl("/api/login"), {
@@ -241,7 +242,7 @@ window.DaisyAuth = {
       const { error } = await supabase.auth.signOut();
       if (error) throw new Error(authErrorMessage(error));
     }
-    if (config.localAuthAvailable) {
+    if (config.localAuthAvailable && !apiBaseIsCrossOrigin) {
       await nativeFetch(apiUrl("/api/logout"), {
         method: "POST",
         credentials: config.apiBaseUrl ? "include" : "same-origin",
