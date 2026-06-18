@@ -80,7 +80,7 @@ function authErrorMessage(error) {
   const message = String(error?.message || error || "");
   const lower = message.toLowerCase();
   if (!message) return "操作失败，请稍后再试";
-  if (lower.includes("supabase no-email signup is not configured")) return "免邮箱验证注册还未配置：请在 Vercel 后端环境变量添加 SUPABASE_SERVICE_ROLE_KEY，或在 Supabase 关闭邮箱确认";
+  if (lower.includes("supabase no-email signup is not configured")) return "免邮箱验证注册还未配置：请在 Vercel 后端环境变量添加 SUPABASE_SERVICE_ROLE_KEY";
   if (lower.includes("supabase no-email login bootstrap is not configured")) return "免邮箱验证登录补齐还未配置：请在 Vercel 后端环境变量添加 SUPABASE_SERVICE_ROLE_KEY";
   if (lower.includes("supabase no-email signup failed")) return "Supabase 免验证注册失败，请检查 service_role 密钥和 Supabase 项目设置";
   if (lower.includes("supabase no-email login bootstrap failed")) return "Supabase 账号补齐失败，请检查 service_role 密钥和 Supabase 项目设置";
