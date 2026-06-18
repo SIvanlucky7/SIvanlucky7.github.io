@@ -138,7 +138,7 @@
             <div class="drop-zone" id="dropZone">
               <i data-lucide="upload-cloud"></i>
               <span>拖拽文件到这里，或选择 TXT/DOCX/PDF</span>
-              <input id="fileInput" type="file" accept=".txt,.doc,.docx,.pdf" />
+              <input id="fileInput" type="file" accept=".txt,.docx,.pdf" />
             </div>
             <div class="report-upload-panel" id="reportUploadPanel" hidden>
               <div class="report-tip"><i data-lucide="circle-help"></i> 基于报告中标记的问题段落，针对性改写原文。</div>
@@ -147,8 +147,8 @@
                 <div class="report-drop-card">
                   <i data-lucide="clipboard-list"></i>
                   <strong id="reportFileName">点击或拖拽上传检测报告</strong>
-                  <small>仅支持 .docx · 最大 15MB</small>
-                  <input id="reportFileInput" type="file" accept=".docx" />
+                  <small>支持 .docx/.pdf · 最大 15MB</small>
+                  <input id="reportFileInput" type="file" accept=".docx,.pdf" />
                 </div>
               </label>
               <label class="report-file-field">
@@ -156,8 +156,8 @@
                 <div class="report-drop-card">
                   <i data-lucide="file-text"></i>
                   <strong id="originalFileName">点击或拖拽上传原文文件</strong>
-                  <small>仅支持 .docx · 最大 15MB</small>
-                  <input id="originalFileInput" type="file" accept=".docx" />
+                  <small>支持 .docx/.pdf · 最大 15MB</small>
+                  <input id="originalFileInput" type="file" accept=".docx,.pdf" />
                 </div>
               </label>
             </div>

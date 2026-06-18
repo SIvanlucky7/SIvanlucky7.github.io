@@ -23,6 +23,9 @@ const state = {
   sourceFileBase64: "",
   originalFileBase64: "",
   reportFileBase64: "",
+  sourceFileChars: 0,
+  originalFileChars: 0,
+  reportFileChars: 0,
   paymentPollTimer: null,
 };
 
@@ -207,8 +210,12 @@ function languagePricing(value) {
   return LANGUAGE_RATES[value] || LANGUAGE_RATES.zh;
 }
 
-function quoteJob(text = sourceText.value.trim()) {
-  const length = text.length;
+function quoteJob(text = state.input === "text" ? sourceText.value.trim() : "") {
+  const length = state.input === "file"
+    ? state.sourceFileChars
+    : state.input === "report"
+      ? state.originalFileChars
+      : text.length;
   const units = length ? Math.ceil(length / UNIT_CHARS) : 0;
   const language = document.querySelector("#language").value;
   const languageRate = languagePricing(language);
@@ -217,6 +224,11 @@ function quoteJob(text = sourceText.value.trim()) {
   return {
     text,
     length,
+    hasInput: state.input === "text"
+      ? Boolean(text)
+      : state.input === "file"
+        ? Boolean(state.sourceFileBase64)
+        : Boolean(state.originalFileBase64 && state.reportFileBase64),
     units,
     amount,
     unitPrice,
@@ -242,12 +254,12 @@ function updatePrice() {
   const quote = quoteJob();
   const length = quote.length;
   const price = quote.amount;
-  count.textContent = `总字符数：${length}/6000`;
+  count.textContent = state.input === "text" ? `总字符数：${length}/6000` : `文档字数：${length}`;
   cost.textContent = state.rate
     ? `预计费用：¥${price.toFixed(2)}，${quote.languageName} ¥${quote.unitPrice.toFixed(2)}/千字，按 ${length} 字折算`
     : "预计费用：联系客服";
   balance.textContent = `¥ ${state.balance.toFixed(2)}`;
-  submitBtn.disabled = length === 0 || length > 6000 || (state.input === "report" && !state.reportText);
+  submitBtn.disabled = !quote.hasInput || (state.input === "text" && length > 6000);
   loginBtn.textContent = state.authenticated ? state.email : "登录 / 注册";
   accountBtn.hidden = !state.authenticated;
   logoutBtn.hidden = !state.authenticated;
@@ -374,15 +386,17 @@ fileInput.addEventListener("change", async () => {
   await extractFileToText(file, {
     loadingText: `正在解析文件：${file.name}`,
     onSuccess: async (payload) => {
-      sourceText.value = payload.text;
+      sourceText.value = "";
       state.sourceFileName = file.name;
       state.sourceFileBase64 = await fileToBase64(file);
-      showToast(payload.truncated ? `已提取前 ${payload.limit} 字，可分批处理全文。` : `已提取 ${payload.chars} 字`);
+      state.sourceFileChars = Number(payload.chars || 0);
+      showToast(`已选择 ${file.name}，识别到 ${payload.chars} 字，提交后将输出 Word 文档`);
     },
     onError: () => {
       sourceText.value = "";
       state.sourceFileName = "";
       state.sourceFileBase64 = "";
+      state.sourceFileChars = 0;
     },
   });
 });
@@ -407,11 +421,11 @@ async function extractFileToText(file, { loadingText = "", onSuccess, onError } 
   const formData = new FormData();
   formData.append("file", file);
   if (loadingText) {
-    sourceText.value = loadingText;
+    showToast(loadingText);
     updatePrice();
   }
   try {
-    const response = await authFetch("/api/extract-file", {
+    const response = await authFetch("/api/inspect-file", {
       method: "POST",
       body: formData,
     });
@@ -433,21 +447,24 @@ function updateInputMode() {
   const isReport = state.input === "report";
   dropZone.classList.toggle("visible", isFile);
   reportUploadPanel.hidden = !isReport;
-  sourceText.hidden = isReport;
-  sampleBtn.hidden = isReport;
-  resultText.hidden = isReport && !resultText.value;
+  sourceText.hidden = isReport || isFile;
+  sampleBtn.hidden = isReport || isFile;
+  resultText.hidden = (isReport || isFile) && !resultText.value;
   if (!isReport) {
     state.reportText = "";
     state.reportFileName = "";
     state.originalFileName = "";
     state.reportFileBase64 = "";
     state.originalFileBase64 = "";
+    state.reportFileChars = 0;
+    state.originalFileChars = 0;
     reportFileName.textContent = "点击或拖拽上传检测报告";
     originalFileName.textContent = "点击或拖拽上传原文文件";
   }
   if (state.input !== "file") {
     state.sourceFileName = "";
     state.sourceFileBase64 = "";
+    state.sourceFileChars = 0;
   }
   updatePrice();
   createIconsSafe();
@@ -459,16 +476,18 @@ reportFileInput.addEventListener("change", async () => {
   reportFileName.textContent = `正在解析：${file.name}`;
   const payload = await extractFileToText(file, {
     onSuccess: async (payload) => {
-      state.reportText = payload.text;
+      state.reportText = "";
       state.reportFileName = file.name;
       state.reportFileBase64 = await fileToBase64(file);
+      state.reportFileChars = Number(payload.chars || 0);
       reportFileName.textContent = file.name;
-      showToast(`检测报告已读取 ${payload.chars} 字`);
+      showToast(`已选择检测报告 ${file.name}`);
     },
     onError: () => {
       state.reportText = "";
       state.reportFileName = "";
       state.reportFileBase64 = "";
+      state.reportFileChars = 0;
       reportFileName.textContent = "点击或拖拽上传检测报告";
     },
   });
@@ -481,16 +500,18 @@ originalFileInput.addEventListener("change", async () => {
   originalFileName.textContent = `正在解析：${file.name}`;
   const payload = await extractFileToText(file, {
     onSuccess: async (payload) => {
-      sourceText.value = payload.text;
+      sourceText.value = "";
       state.originalFileName = file.name;
       state.originalFileBase64 = await fileToBase64(file);
+      state.originalFileChars = Number(payload.chars || 0);
       originalFileName.textContent = file.name;
-      showToast(payload.truncated ? `原文已提取前 ${payload.limit} 字，可分批处理。` : `原文已读取 ${payload.chars} 字`);
+      showToast(`已选择原文 ${file.name}，识别到 ${payload.chars} 字`);
     },
     onError: () => {
       sourceText.value = "";
       state.originalFileName = "";
       state.originalFileBase64 = "";
+      state.originalFileChars = 0;
       originalFileName.textContent = "点击或拖拽上传原文文件";
     },
   });
@@ -530,12 +551,11 @@ function closeOrderConfirmModal() {
 
 async function submitJob() {
   const job = quoteJob();
-  if (!job.text) return;
-  if (job.inputType === "report" && !job.reportText) {
-    showToast("请先上传检测报告和原文文件。");
+  if (!job.hasInput) {
+    showToast(job.inputType === "report" ? "请先上传检测报告和原文文件。" : "请先输入文本或上传文件。");
     return;
   }
-  if (job.length > 6000) {
+  if (job.inputType === "text" && job.length > 6000) {
     showToast("单次最多处理 6000 字，请分批提交。");
     return;
   }
@@ -571,7 +591,7 @@ async function runOptimize(job) {
 
   try {
     setStep(1);
-    resultText.hidden = false;
+    resultText.hidden = job.inputType !== "text";
     if (resultEmpty) resultEmpty.hidden = true;
     const response = await authFetch("/api/optimize", {
       method: "POST",
@@ -592,7 +612,19 @@ async function runOptimize(job) {
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error || "处理失败");
     setStep(2);
-    resultText.value = payload.result;
+    if (job.inputType === "text") {
+      resultText.value = payload.result;
+      resultText.hidden = false;
+      if (resultEmpty) resultEmpty.hidden = true;
+    } else {
+      resultText.value = "";
+      resultText.hidden = true;
+      if (resultEmpty) {
+        resultEmpty.hidden = false;
+        resultEmpty.querySelector("strong").textContent = "Word 文档已生成";
+        resultEmpty.querySelector("span").textContent = "请点击下方导出 Word 下载结果";
+      }
+    }
     state.lastDownloadUrl = payload.download_url || "";
     state.lastOutputFilename = payload.output_filename || "";
     downloadBtn.innerHTML = job.inputType === "text"
