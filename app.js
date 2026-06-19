@@ -7,7 +7,7 @@ const state = {
   authenticated: false,
   email: "",
   authMode: "login",
-  paymentAmount: 50,
+  paymentAmount: 5,
   pendingPayment: null,
   mockPaymentsEnabled: false,
   supabaseAuthEnabled: false,
@@ -100,6 +100,8 @@ const paymentHint = document.querySelector("#paymentHint");
 const paymentSelectedAmount = document.querySelector("#paymentSelectedAmount");
 const paymentCurrentBalance = document.querySelector("#paymentCurrentBalance");
 const paymentStatusBadge = document.querySelector("#paymentStatusBadge");
+const paymentCustomField = document.querySelector("#paymentCustomField");
+const paymentCustomAmount = document.querySelector("#paymentCustomAmount");
 const paymentSteps = ["#paymentStepAmount", "#paymentStepPay", "#paymentStepReview"].map((selector) => document.querySelector(selector));
 const paymentManual = document.querySelector("#paymentManual");
 const paymentQrImage = document.querySelector("#paymentQrImage");
@@ -932,21 +934,49 @@ refreshPaymentsBtn.addEventListener("click", async () => {
   await refreshAccount();
 });
 
+function resetPaymentSelectionUi() {
+  state.pendingPayment = null;
+  paymentOrder.textContent = "未创建";
+  paymentHint.textContent = `当前选择 ¥${Number(state.paymentAmount || 0).toFixed(2)}`;
+  resetManualPayment();
+  confirmPaymentBtn.disabled = true;
+  confirmPaymentBtn.hidden = !state.mockPaymentsEnabled;
+  syncPaymentUiExtras();
+}
+
+function setPaymentAmount(amount, activeButton = null, custom = false) {
+  state.paymentAmount = Number(amount || 0);
+  document.querySelectorAll("[data-pay-amount], [data-pay-custom]").forEach((item) => item.classList.toggle("active", item === activeButton));
+  if (paymentCustomField) paymentCustomField.hidden = !custom;
+  resetPaymentSelectionUi();
+}
+
 document.querySelectorAll("[data-pay-amount]").forEach((button) => {
   button.addEventListener("click", () => {
-    state.paymentAmount = Number(button.dataset.payAmount);
-    state.pendingPayment = null;
-    document.querySelectorAll("[data-pay-amount]").forEach((item) => item.classList.toggle("active", item === button));
-    paymentOrder.textContent = "未创建";
-    paymentHint.textContent = `当前选择 ¥${state.paymentAmount}`;
-    resetManualPayment();
-    confirmPaymentBtn.disabled = true;
-    confirmPaymentBtn.hidden = !state.mockPaymentsEnabled;
+    setPaymentAmount(Number(button.dataset.payAmount), button, false);
   });
+});
+
+document.querySelectorAll("[data-pay-custom]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const value = Number(paymentCustomAmount?.value || 5);
+    setPaymentAmount(value >= 5 ? value : 5, button, true);
+    paymentCustomAmount?.focus();
+  });
+});
+
+paymentCustomAmount?.addEventListener("input", () => {
+  state.paymentAmount = Number(paymentCustomAmount.value || 0);
+  resetPaymentSelectionUi();
 });
 
 createPaymentBtn.addEventListener("click", async () => {
   try {
+    if (!Number.isFinite(Number(state.paymentAmount)) || Number(state.paymentAmount) < 5) {
+      showToast("自定义充值金额不能低于 ¥5.00");
+      paymentCustomAmount?.focus();
+      return;
+    }
     const response = await authFetch("/api/payments/create", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

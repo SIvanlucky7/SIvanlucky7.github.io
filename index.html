@@ -340,12 +340,17 @@
               <small>余额可用于降重、降 AI、组合处理和 API 调用</small>
             </div>
             <div class="payment-packages">
+              <button class="active" data-pay-amount="5">¥5</button>
               <button data-pay-amount="10">¥10</button>
               <button data-pay-amount="30">¥30</button>
-              <button class="active" data-pay-amount="50">¥50</button>
+              <button data-pay-amount="50">¥50</button>
               <button data-pay-amount="100">¥100</button>
-              <button data-pay-amount="200">¥200</button>
+              <button data-pay-custom="1">自定义</button>
             </div>
+            <label class="payment-custom-field" id="paymentCustomField" hidden>
+              <span>自定义充值金额</span>
+              <input id="paymentCustomAmount" type="number" min="5" max="5000" step="0.01" inputmode="decimal" placeholder="最低 ¥5.00" />
+            </label>
             <button class="auth-submit" id="createPaymentBtn">创建支付单</button>
             <button class="auth-submit secondary-action" id="confirmPaymentBtn" disabled>演示环境：确认到账</button>
           </section>
@@ -360,7 +365,7 @@
             </div>
             <div class="payment-summary-row">
               <span>本次充值</span>
-              <strong id="paymentSelectedAmount">¥50.00</strong>
+              <strong id="paymentSelectedAmount">¥5.00</strong>
             </div>
             <div class="payment-summary-row">
               <span>支付单号</span>
@@ -391,7 +396,7 @@
             </ul>
             <label class="payment-proof-field">
               <span>实际付款金额</span>
-              <input id="paymentClaimedAmount" type="number" min="0.01" max="5000" step="0.01" inputmode="decimal" placeholder="例如 50.00" />
+              <input id="paymentClaimedAmount" type="number" min="5" max="5000" step="0.01" inputmode="decimal" placeholder="例如 5.00" />
             </label>
             <label class="payment-proof-field">
               <span>付款交易号</span>

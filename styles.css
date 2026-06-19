@@ -2079,6 +2079,36 @@ footer a {
   box-shadow: 0 10px 24px rgba(28, 91, 200, 0.18);
 }
 
+.payment-custom-field {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  color: var(--brand-dark);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.payment-custom-field[hidden] {
+  display: none;
+}
+
+.payment-custom-field input {
+  min-height: 42px;
+  border: 1px solid #d7e1ed;
+  border-radius: 8px;
+  padding: 0 12px;
+  outline: none;
+  color: var(--ink);
+  background: #fff;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.payment-custom-field input:focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(28, 91, 200, 0.12);
+}
+
 .payment-card {
   display: grid;
   align-content: start;
