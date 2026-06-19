@@ -93,6 +93,14 @@ const orderConfirmClose = document.querySelector("#orderConfirmClose");
 const orderCancelBtn = document.querySelector("#orderCancelBtn");
 const orderConfirmSummary = document.querySelector("#orderConfirmSummary");
 const confirmOrderBtn = document.querySelector("#confirmOrderBtn");
+const orderProgress = document.querySelector("#orderProgress");
+const orderProgressTitle = document.querySelector("#orderProgressTitle");
+const orderProgressPercent = document.querySelector("#orderProgressPercent");
+const orderProgressBar = document.querySelector("#orderProgressBar");
+const orderProgressDetail = document.querySelector("#orderProgressDetail");
+const progressStepUpload = document.querySelector("#progressStepUpload");
+const progressStepProcess = document.querySelector("#progressStepProcess");
+const progressStepExport = document.querySelector("#progressStepExport");
 const createPaymentBtn = document.querySelector("#createPaymentBtn");
 const confirmPaymentBtn = document.querySelector("#confirmPaymentBtn");
 const paymentOrder = document.querySelector("#paymentOrder");
@@ -589,6 +597,68 @@ function closeOrderConfirmModal() {
   orderConfirmModal.hidden = true;
   state.pendingJob = null;
   confirmOrderBtn.disabled = false;
+  resetOrderProgress();
+}
+
+function setOrderProgress({ percent = 0, title = "", detail = "", active = 0, error = false } = {}) {
+  if (!orderProgress) return;
+  const value = Math.max(0, Math.min(100, Math.round(percent)));
+  orderProgress.hidden = false;
+  orderProgress.classList.toggle("error", Boolean(error));
+  if (orderProgressTitle) orderProgressTitle.textContent = title || "处理中";
+  if (orderProgressPercent) orderProgressPercent.textContent = `${value}%`;
+  if (orderProgressBar) orderProgressBar.style.width = `${value}%`;
+  if (orderProgressDetail) orderProgressDetail.textContent = detail || "";
+  [progressStepUpload, progressStepProcess, progressStepExport].forEach((step, index) => {
+    if (!step) return;
+    step.classList.toggle("done", index < active);
+    step.classList.toggle("active", index === active && !error);
+  });
+}
+
+function resetOrderProgress() {
+  if (!orderProgress) return;
+  orderProgress.hidden = true;
+  orderProgress.classList.remove("error");
+  if (orderProgressBar) orderProgressBar.style.width = "0%";
+  if (orderProgressPercent) orderProgressPercent.textContent = "0%";
+  [progressStepUpload, progressStepProcess, progressStepExport].forEach((step) => {
+    if (!step) return;
+    step.classList.remove("active", "done");
+  });
+}
+
+function startProcessingTicker(job) {
+  let elapsed = 0;
+  const isDocument = job.inputType !== "text";
+  const maxBeforeHold = isDocument ? 88 : 82;
+  setOrderProgress({
+    percent: 18,
+    title: "正在上传",
+    detail: isDocument ? "正在上传 Word/PDF 文件，请不要关闭页面。" : "正在提交文本并创建处理订单。",
+    active: 0,
+  });
+  return window.setInterval(() => {
+    elapsed += 3;
+    const percent = Math.min(maxBeforeHold, 26 + elapsed);
+    const minuteText = elapsed >= 60 ? `，已等待 ${Math.floor(elapsed / 60)} 分 ${elapsed % 60} 秒` : `，已等待 ${elapsed} 秒`;
+    setOrderProgress({
+      percent,
+      title: "BypassAIGC 处理中",
+      detail: isDocument
+        ? `正在分段降低 AIGC 并准备 Word 输出${minuteText}。文件越大越慢，页面有响应就仍在等待结果。`
+        : `正在调用 BypassAIGC 优化文本${minuteText}。`,
+      active: 1,
+    });
+  }, 3000);
+}
+
+function friendlyFetchError(error) {
+  const message = String(error?.message || error || "");
+  if (message.includes("Failed to fetch") || message.includes("NetworkError") || message.includes("Load failed")) {
+    return "网络请求中断或处理超时。文件处理可能仍在后端排队，请刷新订单中心查看；如果没有生成订单，请缩短文件后重试。";
+  }
+  return message || "处理失败，请稍后重试。";
 }
 
 async function submitJob() {
@@ -622,8 +692,10 @@ async function submitJob() {
 
 async function runOptimize(job) {
   const price = job.amount;
+  let progressTimer = null;
   submitBtn.disabled = true;
   confirmOrderBtn.disabled = true;
+  confirmOrderBtn.textContent = "处理中...";
   submitBtn.innerHTML = '<i data-lucide="loader-2"></i>处理中';
   resultText.value = "";
   state.lastDownloadUrl = "";
@@ -632,6 +704,7 @@ async function runOptimize(job) {
   createIconsSafe();
 
   try {
+    progressTimer = startProcessingTicker(job);
     setStep(1);
     resultText.hidden = job.inputType !== "text";
     if (resultEmpty) resultEmpty.hidden = true;
@@ -651,8 +724,18 @@ async function runOptimize(job) {
         text: job.text,
       }),
     });
-    const payload = await response.json();
+    const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.error || "处理失败");
+    if (progressTimer) {
+      window.clearInterval(progressTimer);
+      progressTimer = null;
+    }
+    setOrderProgress({
+      percent: 94,
+      title: "正在生成结果",
+      detail: job.inputType === "text" ? "正在写入订单并刷新余额。" : "正在生成 Word 文件、标红改动内容并刷新余额。",
+      active: 2,
+    });
     setStep(2);
     if (job.inputType === "text") {
       resultText.value = payload.result;
@@ -675,12 +758,23 @@ async function runOptimize(job) {
     state.balance = Number(payload.balance ?? Math.max(0, state.balance - price));
     closeOrderConfirmModal();
     updatePrice();
+    setOrderProgress({ percent: 100, title: "处理完成", detail: "结果已生成。", active: 3 });
     showToast(`订单 ${payload.order_id} 已完成，扣费 ¥${Number(payload.amount || price).toFixed(2)}`);
   } catch (error) {
-    showToast(error.message);
+    if (progressTimer) window.clearInterval(progressTimer);
+    const message = friendlyFetchError(error);
+    setOrderProgress({
+      percent: 100,
+      title: "处理失败",
+      detail: message,
+      active: 1,
+      error: true,
+    });
+    showToast(message);
   } finally {
     submitBtn.innerHTML = '<i data-lucide="arrow-right"></i>提交';
     confirmOrderBtn.disabled = false;
+    confirmOrderBtn.textContent = "确认并处理";
     createIconsSafe();
     updatePrice();
   }

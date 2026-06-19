@@ -303,6 +303,21 @@
           </div>
         </div>
         <div class="order-confirm-summary" id="orderConfirmSummary"></div>
+        <div class="order-progress" id="orderProgress" hidden>
+          <div class="order-progress-head">
+            <strong id="orderProgressTitle">准备处理</strong>
+            <span id="orderProgressPercent">0%</span>
+          </div>
+          <div class="order-progress-track" aria-hidden="true">
+            <span id="orderProgressBar"></span>
+          </div>
+          <p id="orderProgressDetail">确认后开始上传文件并创建订单。</p>
+          <ol class="order-progress-steps">
+            <li id="progressStepUpload">上传文件</li>
+            <li id="progressStepProcess">BypassAIGC 处理中</li>
+            <li id="progressStepExport">生成 Word / 扣费</li>
+          </ol>
+        </div>
         <p class="order-confirm-note">请确认文本已按要求脱敏。系统会按订单保存处理结果，用户可在订单中心删除结果内容。</p>
         <div class="order-confirm-actions">
           <button class="secondary-action" id="orderCancelBtn" type="button">取消</button>
