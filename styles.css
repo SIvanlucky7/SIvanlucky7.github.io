@@ -1228,6 +1228,13 @@ fieldset {
   display: flex;
 }
 
+.drop-zone.is-dragover,
+.report-drop-card.is-dragover {
+  border-color: var(--brand);
+  background: #fff0f7;
+  box-shadow: 0 0 0 3px rgba(219, 107, 154, 0.14);
+}
+
 .drop-zone input {
   position: absolute;
   inset: 0;

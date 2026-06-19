@@ -53,6 +53,7 @@ const downloadBtn = document.querySelector("#downloadBtn");
 const clearResultBtn = document.querySelector("#clearResultBtn");
 const dropZone = document.querySelector("#dropZone");
 const fileInput = document.querySelector("#fileInput");
+const dropZoneLabel = dropZone?.querySelector("span");
 const reportUploadPanel = document.querySelector("#reportUploadPanel");
 const reportFileInput = document.querySelector("#reportFileInput");
 const originalFileInput = document.querySelector("#originalFileInput");
@@ -380,8 +381,7 @@ sampleBtn.addEventListener("click", () => {
   updatePrice();
 });
 
-fileInput.addEventListener("change", async () => {
-  const file = fileInput.files?.[0];
+async function handleSourceFile(file) {
   if (!file) return;
   await extractFileToText(file, {
     loadingText: `正在解析文件：${file.name}`,
@@ -390,6 +390,7 @@ fileInput.addEventListener("change", async () => {
       state.sourceFileName = file.name;
       state.sourceFileBase64 = await fileToBase64(file);
       state.sourceFileChars = Number(payload.chars || 0);
+      if (dropZoneLabel) dropZoneLabel.textContent = `${file.name} · ${payload.chars} 字 · 提交后导出 Word`;
       showToast(`已选择 ${file.name}，识别到 ${payload.chars} 字，提交后将输出 Word 文档`);
     },
     onError: () => {
@@ -397,8 +398,13 @@ fileInput.addEventListener("change", async () => {
       state.sourceFileName = "";
       state.sourceFileBase64 = "";
       state.sourceFileChars = 0;
+      if (dropZoneLabel) dropZoneLabel.textContent = "拖拽文件到这里，或选择 TXT/DOCX/PDF";
     },
   });
+}
+
+fileInput.addEventListener("change", async () => {
+  await handleSourceFile(fileInput.files?.[0]);
 });
 
 function fileToBase64(file) {
@@ -465,13 +471,13 @@ function updateInputMode() {
     state.sourceFileName = "";
     state.sourceFileBase64 = "";
     state.sourceFileChars = 0;
+    if (dropZoneLabel) dropZoneLabel.textContent = "拖拽文件到这里，或选择 TXT/DOCX/PDF";
   }
   updatePrice();
   createIconsSafe();
 }
 
-reportFileInput.addEventListener("change", async () => {
-  const file = reportFileInput.files?.[0];
+async function handleReportFile(file) {
   if (!file) return;
   reportFileName.textContent = `正在解析：${file.name}`;
   const payload = await extractFileToText(file, {
@@ -492,10 +498,13 @@ reportFileInput.addEventListener("change", async () => {
     },
   });
   if (!payload) updatePrice();
+}
+
+reportFileInput.addEventListener("change", async () => {
+  await handleReportFile(reportFileInput.files?.[0]);
 });
 
-originalFileInput.addEventListener("change", async () => {
-  const file = originalFileInput.files?.[0];
+async function handleOriginalFile(file) {
   if (!file) return;
   originalFileName.textContent = `正在解析：${file.name}`;
   const payload = await extractFileToText(file, {
@@ -516,7 +525,38 @@ originalFileInput.addEventListener("change", async () => {
     },
   });
   if (!payload) updatePrice();
+}
+
+originalFileInput.addEventListener("change", async () => {
+  await handleOriginalFile(originalFileInput.files?.[0]);
 });
+
+function bindDropTarget(element, handler) {
+  if (!element) return;
+  ["dragenter", "dragover"].forEach((eventName) => {
+    element.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      element.classList.add("is-dragover");
+    });
+  });
+  ["dragleave", "drop"].forEach((eventName) => {
+    element.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      element.classList.remove("is-dragover");
+    });
+  });
+  element.addEventListener("drop", async (event) => {
+    const file = event.dataTransfer?.files?.[0];
+    if (!file) return;
+    await handler(file);
+  });
+}
+
+bindDropTarget(dropZone, handleSourceFile);
+bindDropTarget(reportFileInput.closest(".report-drop-card"), handleReportFile);
+bindDropTarget(originalFileInput.closest(".report-drop-card"), handleOriginalFile);
 
 function renderOrderConfirm(job) {
   orderConfirmSummary.innerHTML = `
