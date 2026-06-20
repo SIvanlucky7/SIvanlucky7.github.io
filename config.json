@@ -1,5 +1,5 @@
 {
   "VITE_SUPABASE_URL": "https://iitybznpwmtwrlscmwew.supabase.co",
   "VITE_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlpdHliem5wd210d3Jsc2Ntd2V3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwMzA4NDcsImV4cCI6MjA5NjYwNjg0N30.Ls2yyjYPaM1Y1zODDbkzw2WvKgrV_1uwAoz39Somu9Q",
-  "API_BASE_URL": "https://daisy-aigc.vercel.app"
+  "API_BASE_URL": ""
 }

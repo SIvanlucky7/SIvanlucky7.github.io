@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Daisy AIGC Diagnostics</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: Arial, "Microsoft YaHei", sans-serif;
+        background: #f5f7fb;
+        color: #18233f;
+      }
+      main {
+        max-width: 980px;
+        margin: 40px auto;
+        padding: 0 20px;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 28px;
+      }
+      .muted {
+        color: #63708a;
+      }
+      .panel {
+        margin-top: 18px;
+        padding: 18px;
+        border: 1px solid #dce3f0;
+        border-radius: 8px;
+        background: #fff;
+      }
+      button {
+        height: 38px;
+        padding: 0 18px;
+        border: 0;
+        border-radius: 6px;
+        background: #2f45b5;
+        color: #fff;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .status {
+        display: inline-flex;
+        align-items: center;
+        min-width: 76px;
+        height: 26px;
+        margin-right: 10px;
+        padding: 0 10px;
+        border-radius: 999px;
+        font-size: 13px;
+        font-weight: 700;
+      }
+      .pending {
+        background: #eef2ff;
+        color: #3347a7;
+      }
+      .ok {
+        background: #e8f8ee;
+        color: #16783b;
+      }
+      .bad {
+        background: #fff0f0;
+        color: #c62828;
+      }
+      pre {
+        overflow: auto;
+        min-height: 80px;
+        margin: 12px 0 0;
+        padding: 12px;
+        border-radius: 6px;
+        background: #101828;
+        color: #e7eefc;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>雏菊 AIGC 线上自检</h1>
+      <p class="muted">用于确认当前 Chrome 能否访问 Vercel 同源后端，以及线上版本是否为最新修复版。</p>
+      <button id="run">重新检测</button>
+
+      <section class="panel">
+        <h2><span id="healthStatus" class="status pending">等待</span>后端健康检查</h2>
+        <pre id="healthOutput">点击重新检测，或等待页面自动检测。</pre>
+      </section>
+
+      <section class="panel">
+        <h2><span id="configStatus" class="status pending">等待</span>前端配置</h2>
+        <pre id="configOutput">点击重新检测，或等待页面自动检测。</pre>
+      </section>
+
+      <section class="panel">
+        <h2><span id="summaryStatus" class="status pending">等待</span>结论</h2>
+        <pre id="summaryOutput">如果健康检查显示 app_version 为 2026-06-19-network-autofallback-4，说明 Chrome 已经连到新版后端。</pre>
+      </section>
+    </main>
+
+    <script>
+      const versionNeedle = "2026-06-19-network-autofallback-4";
+      const $ = (id) => document.getElementById(id);
+
+      function setStatus(id, state, text) {
+        const el = $(id);
+        el.className = `status ${state}`;
+        el.textContent = text;
+      }
+
+      const apiCandidates = [
+        "",
+        "https://daisy-aigc-api-proxy.western-pantydraco.workers.dev",
+        "https://daisy-aigc-api-proxy.billowy-waste.workers.dev",
+        "https://daisy-aigc.vercel.app",
+      ];
+
+      function withTimeout(promise, ms = 7000) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), ms);
+        return {
+          signal: controller.signal,
+          done: promise(controller.signal).finally(() => clearTimeout(timer)),
+        };
+      }
+
+      async function readJson(url) {
+        const request = withTimeout((signal) => fetch(`${url}${url.includes("?") ? "&" : "?"}t=${Date.now()}`, {
+          cache: "no-store",
+          credentials: "include",
+          signal,
+        }));
+        const response = await request.done;
+        const text = await response.text();
+        let data = null;
+        try {
+          data = JSON.parse(text);
+        } catch {
+          data = text;
+        }
+        return { ok: response.ok, status: response.status, data };
+      }
+
+      async function checkApiCandidates() {
+        const results = [];
+        for (const base of apiCandidates) {
+          const started = Date.now();
+          const label = base || "(same-origin)";
+          try {
+            const url = `${base}/api/health`;
+            const payload = await readJson(url);
+            results.push({ apiBaseUrl: label, ms: Date.now() - started, ...payload });
+          } catch (error) {
+            results.push({
+              apiBaseUrl: label,
+              ok: false,
+              ms: Date.now() - started,
+              error: error && error.name === "AbortError" ? "timeout" : String(error && error.message ? error.message : error),
+            });
+          }
+        }
+        return results;
+      }
+
+      async function run() {
+        setStatus("healthStatus", "pending", "检测中");
+        setStatus("configStatus", "pending", "检测中");
+        setStatus("summaryStatus", "pending", "检测中");
+        $("healthOutput").textContent = "正在检测多个 API 入口 ...";
+        $("configOutput").textContent = "正在请求 /config.json ...";
+        $("summaryOutput").textContent = "正在检测...";
+
+        let health;
+        let config;
+        try {
+          health = await checkApiCandidates();
+          $("healthOutput").textContent = JSON.stringify(health, null, 2);
+          setStatus(
+            "healthStatus",
+            JSON.stringify(health).includes(versionNeedle) ? "ok" : "bad",
+            JSON.stringify(health).includes(versionNeedle) ? "已连接" : "失败",
+          );
+        } catch (error) {
+          $("healthOutput").textContent = String(error && error.message ? error.message : error);
+          setStatus("healthStatus", "bad", "失败");
+        }
+
+        try {
+          config = await readJson("/config.json");
+          $("configOutput").textContent = JSON.stringify(config, null, 2);
+          const sameOrigin = config.ok && config.data && config.data.API_BASE_URL === "";
+          setStatus("configStatus", sameOrigin ? "ok" : "bad", sameOrigin ? "同源" : "异常");
+        } catch (error) {
+          $("configOutput").textContent = String(error && error.message ? error.message : error);
+          setStatus("configStatus", "bad", "失败");
+        }
+
+        const healthText = JSON.stringify(health || {});
+        const sameOriginConfig = Boolean(config && config.ok && config.data && config.data.API_BASE_URL === "");
+        if (healthText.includes(versionNeedle) && sameOriginConfig) {
+          setStatus("summaryStatus", "ok", "正常");
+          $("summaryOutput").textContent = "当前 Chrome 已连接新版同源后端，可以回首页测试文本、文件、报告处理。";
+        } else {
+          setStatus("summaryStatus", "bad", "需处理");
+          $("summaryOutput").textContent = "仍未检测到新版同源后端。请强刷 Ctrl+F5，或把本页检测结果截图发给 Codex。";
+        }
+      }
+
+      $("run").addEventListener("click", run);
+      run();
+    </script>
+  </body>
+</html>

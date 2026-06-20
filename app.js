@@ -150,6 +150,15 @@ function createIconsSafe() {
   }
 }
 
+function setResultEmpty(title, detail, hidden = false) {
+  if (!resultEmpty) return;
+  resultEmpty.hidden = Boolean(hidden);
+  const strong = resultEmpty.querySelector("strong");
+  const span = resultEmpty.querySelector("span");
+  if (strong) strong.textContent = title || "";
+  if (span) span.textContent = detail || "";
+}
+
 function waitForDaisyAuth() {
   if (window.DaisyAuth) return Promise.resolve(window.DaisyAuth);
   return new Promise((resolve) => {
@@ -274,8 +283,8 @@ function updatePrice() {
   loginBtn.textContent = state.authenticated ? state.email : "登录 / 注册";
   accountBtn.hidden = !state.authenticated;
   logoutBtn.hidden = !state.authenticated;
-  if (resultEmpty) {
-    resultEmpty.hidden = state.input !== "report" || Boolean(resultText.value);
+  if (resultEmpty && state.input === "text") {
+    resultEmpty.hidden = Boolean(resultText.value);
   }
 }
 
@@ -400,7 +409,12 @@ async function handleSourceFile(file) {
       state.sourceFileName = file.name;
       state.sourceFileBase64 = await fileToBase64(file);
       state.sourceFileChars = Number(payload.chars || 0);
+      state.lastDownloadUrl = "";
+      state.lastOutputFilename = "";
+      resultText.value = "";
+      resultText.hidden = true;
       if (dropZoneLabel) dropZoneLabel.textContent = `${file.name} · ${payload.chars} 字 · 提交后导出 Word`;
+      setResultEmpty("\u6587\u4ef6\u5df2\u8bfb\u53d6\uff0c\u7b49\u5f85\u63d0\u4ea4", "\u8fd8\u6ca1\u6709\u5f00\u59cb\u964d\u4f4e AIGC\u3002\u8bf7\u70b9\u51fb\u4e2d\u95f4\u7684\u63d0\u4ea4\u6309\u94ae\uff0c\u7136\u540e\u5728\u5f39\u7a97\u91cc\u70b9\u51fb\u786e\u8ba4\u5e76\u5904\u7406\u3002", false);
       showToast(`已选择 ${file.name}，识别到 ${payload.chars} 字，提交后将输出 Word 文档`);
     },
     onError: () => {
@@ -408,7 +422,7 @@ async function handleSourceFile(file) {
       state.sourceFileName = "";
       state.sourceFileBase64 = "";
       state.sourceFileChars = 0;
-      if (dropZoneLabel) dropZoneLabel.textContent = "拖拽文件到这里，或选择 TXT/DOCX/PDF";
+      if (dropZoneLabel) dropZoneLabel.textContent = "将文件拖到此处，或点击上传";
     },
   });
 }
@@ -427,13 +441,6 @@ function fileToBase64(file) {
 }
 
 async function extractFileToText(file, { loadingText = "", onSuccess, onError } = {}) {
-  if (!(await ensureAuthenticated())) {
-    showToast("请先登录后上传文件。");
-    openAuthModal("login");
-    onError?.(new Error("login required"));
-    updatePrice();
-    return null;
-  }
   const formData = new FormData();
   formData.append("file", file);
   if (loadingText) {
@@ -481,7 +488,7 @@ function updateInputMode() {
     state.sourceFileName = "";
     state.sourceFileBase64 = "";
     state.sourceFileChars = 0;
-    if (dropZoneLabel) dropZoneLabel.textContent = "拖拽文件到这里，或选择 TXT/DOCX/PDF";
+    if (dropZoneLabel) dropZoneLabel.textContent = "将文件拖到此处，或点击上传";
   }
   updatePrice();
   createIconsSafe();
@@ -567,6 +574,55 @@ function bindDropTarget(element, handler) {
 bindDropTarget(dropZone, handleSourceFile);
 bindDropTarget(reportFileInput.closest(".report-drop-card"), handleReportFile);
 bindDropTarget(originalFileInput.closest(".report-drop-card"), handleOriginalFile);
+
+function hasDraggedFiles(event) {
+  return Array.from(event.dataTransfer?.types || []).includes("Files");
+}
+
+document.addEventListener("dragover", (event) => {
+  if (!hasDraggedFiles(event)) return;
+  event.preventDefault();
+  if (state.input === "file") {
+    dropZone?.classList.add("is-dragover");
+  }
+});
+
+document.addEventListener("dragleave", (event) => {
+  if (!hasDraggedFiles(event)) return;
+  if (!event.relatedTarget) {
+    dropZone?.classList.remove("is-dragover");
+    document.querySelectorAll(".report-drop-card.is-dragover").forEach((item) => item.classList.remove("is-dragover"));
+  }
+});
+
+document.addEventListener("drop", async (event) => {
+  if (!hasDraggedFiles(event)) return;
+  event.preventDefault();
+  dropZone?.classList.remove("is-dragover");
+  document.querySelectorAll(".report-drop-card.is-dragover").forEach((item) => item.classList.remove("is-dragover"));
+  const file = event.dataTransfer?.files?.[0];
+  if (!file) return;
+  if (state.input === "file") {
+    await handleSourceFile(file);
+    return;
+  }
+  if (state.input === "report") {
+    const card = event.target?.closest?.(".report-drop-card");
+    if (card?.contains(originalFileInput)) {
+      await handleOriginalFile(file);
+      return;
+    }
+    if (card?.contains(reportFileInput)) {
+      await handleReportFile(file);
+      return;
+    }
+    if (!state.reportFileBase64) {
+      await handleReportFile(file);
+    } else {
+      await handleOriginalFile(file);
+    }
+  }
+});
 
 function renderOrderConfirm(job) {
   orderConfirmSummary.innerHTML = `
@@ -656,9 +712,10 @@ function startProcessingTicker(job) {
 function friendlyFetchError(error) {
   const message = String(error?.message || error || "");
   if (message.includes("Failed to fetch") || message.includes("NetworkError") || message.includes("Load failed")) {
-    return "网络请求中断或处理超时。文件处理可能仍在后端排队，请刷新订单中心查看；如果没有生成订单，请缩短文件后重试。";
+    const current = window.DaisyNetwork?.selectedApiBaseUrl || window.location.origin;
+    return `\u7f51\u7edc\u8bf7\u6c42\u4e2d\u65ad\u6216\u5904\u7406\u8d85\u65f6\u3002\u5f53\u524d\u5165\u53e3\uff1a${current}\u3002\u8bf7\u5237\u65b0\u9875\u9762\uff0c\u6216\u6253\u5f00 network-fix.html \u6e05\u7406\u65e7 API \u7f13\u5b58\u540e\u91cd\u8bd5\u3002`;
   }
-  return message || "处理失败，请稍后重试。";
+  return message || "\u5904\u7406\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5\u3002";
 }
 
 async function submitJob() {
@@ -687,7 +744,79 @@ async function submitJob() {
     return;
   }
 
+  if (job.inputType !== "text") {
+    setResultEmpty("\u7b49\u5f85\u786e\u8ba4\u8ba2\u5355", "\u8bf7\u5728\u5f39\u51fa\u7684\u786e\u8ba4\u8ba2\u5355\u7a97\u53e3\u70b9\u51fb\u201c\u786e\u8ba4\u5e76\u5904\u7406\u201d\uff0c\u7cfb\u7edf\u624d\u4f1a\u5f00\u59cb\u964d\u4f4e AIGC \u5e76\u751f\u6210 Word\u3002", false);
+  }
   openOrderConfirmModal(job);
+}
+
+function optimizeRequestPayload(job) {
+  return {
+    service: job.service,
+    platform: job.platform,
+    language: job.language,
+    input_type: job.inputType,
+    source_filename: job.sourceFilename,
+    report_filename: job.reportFilename,
+    report_text: job.reportText,
+    source_file_base64: job.sourceFileBase64,
+    report_file_base64: job.reportFileBase64,
+    text: job.text,
+  };
+}
+
+async function postOptimizeJson(path, body) {
+  const response = await authFetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || "\u5904\u7406\u5931\u8d25");
+  return payload;
+}
+
+function renderBackendProgress(payload, job) {
+  const total = Math.max(1, Number(payload.total || 1));
+  const cursor = Math.max(0, Number(payload.cursor || 0));
+  const serverPercent = Number(payload.progress || 0);
+  const percent = payload.status === "completed"
+    ? 94
+    : Math.min(90, Math.max(22, serverPercent || Math.round((cursor / total) * 86)));
+  const batchText = total > 1 ? `\u7b2c ${Math.min(cursor + 1, total)} / ${total} \u6279` : "\u5f53\u524d\u6279\u6b21";
+  const message = payload.message || "BypassAIGC \u6b63\u5728\u5904\u7406\u5f53\u524d\u6279\u6b21";
+  setOrderProgress({
+    percent,
+    title: payload.status === "completed" ? "\u6b63\u5728\u751f\u6210\u7ed3\u679c" : "BypassAIGC \u5904\u7406\u4e2d",
+    detail: job.inputType === "text"
+      ? message
+      : `${batchText}\uff1a${message}\u3002\u6587\u4ef6\u5904\u7406\u671f\u95f4\u8bf7\u4e0d\u8981\u5173\u95ed\u9875\u9762\u3002`,
+    active: payload.status === "completed" ? 2 : 1,
+  });
+}
+
+async function runOptimizeInSteps(job) {
+  let payload = await postOptimizeJson("/api/optimize/start", optimizeRequestPayload(job));
+  renderBackendProgress(payload, job);
+
+  const startedAt = Date.now();
+  const maxMs = 45 * 60 * 1000;
+  let idleWaitMs = 900;
+
+  while (payload.status !== "completed") {
+    if (payload.status === "failed") {
+      throw new Error(payload.error || "\u5904\u7406\u5931\u8d25");
+    }
+    if (Date.now() - startedAt > maxMs) {
+      throw new Error("\u5904\u7406\u65f6\u95f4\u8fc7\u957f\uff0c\u8bf7\u5230\u8ba2\u5355\u4e2d\u5fc3\u67e5\u770b\u7ed3\u679c\uff0c\u6216\u7a0d\u540e\u91cd\u8bd5\u3002");
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, idleWaitMs));
+    payload = await postOptimizeJson("/api/optimize/step", { order_id: payload.order_id });
+    renderBackendProgress(payload, job);
+    idleWaitMs = payload.phase === "bypass_processing" ? 2500 : 900;
+  }
+
+  return payload;
 }
 
 async function runOptimize(job) {
@@ -707,7 +836,16 @@ async function runOptimize(job) {
     progressTimer = startProcessingTicker(job);
     setStep(1);
     resultText.hidden = job.inputType !== "text";
-    if (resultEmpty) resultEmpty.hidden = true;
+    if (job.inputType === "text") {
+      if (resultEmpty) resultEmpty.hidden = true;
+    } else {
+      setResultEmpty("\u6b63\u5728\u964d\u4f4e AIGC", "\u6b63\u5728\u8c03\u7528 BypassAIGC \u5904\u7406\u6587\u4ef6\u5e76\u751f\u6210 Word\uff0c\u8bf7\u4e0d\u8981\u5173\u95ed\u9875\u9762\u3002", false);
+    }
+    let payload = null;
+    if (job.inputType !== "text") {
+      payload = await runOptimizeInSteps(job);
+    }
+    if (!payload) {
     const response = await authFetch("/api/optimize", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -724,8 +862,9 @@ async function runOptimize(job) {
         text: job.text,
       }),
     });
-    const payload = await response.json().catch(() => ({}));
+    payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.error || "处理失败");
+    }
     if (progressTimer) {
       window.clearInterval(progressTimer);
       progressTimer = null;
@@ -744,11 +883,7 @@ async function runOptimize(job) {
     } else {
       resultText.value = "";
       resultText.hidden = true;
-      if (resultEmpty) {
-        resultEmpty.hidden = false;
-        resultEmpty.querySelector("strong").textContent = "Word 文档已生成";
-        resultEmpty.querySelector("span").textContent = "请点击下方导出 Word 下载结果";
-      }
+      setResultEmpty("Word \u6587\u6863\u5df2\u751f\u6210", "\u5df2\u7ecf\u5b8c\u6210\u964d\u4f4e AIGC\uff0c\u8bf7\u70b9\u51fb\u4e0b\u65b9\u201c\u5bfc\u51fa Word\u201d\u4e0b\u8f7d\u7ed3\u679c\u3002", false);
     }
     state.lastDownloadUrl = payload.download_url || "";
     state.lastOutputFilename = payload.output_filename || "";
@@ -770,6 +905,9 @@ async function runOptimize(job) {
       active: 1,
       error: true,
     });
+    if (job.inputType !== "text") {
+      setResultEmpty("\u5904\u7406\u5931\u8d25", message, false);
+    }
     showToast(message);
   } finally {
     submitBtn.innerHTML = '<i data-lucide="arrow-right"></i>提交';
@@ -820,7 +958,7 @@ function filenameFromDisposition(disposition) {
 async function downloadBlob(url, fallbackName) {
   const response = await authFetch(url);
   if (!response.ok) {
-    const payload = await response.json().catch(() => ({}));
+    payload = await response.json().catch(() => ({}));
     throw new Error(payload.error || "下载失败");
   }
   const blob = await response.blob();
@@ -834,24 +972,26 @@ async function downloadBlob(url, fallbackName) {
 }
 
 downloadBtn.addEventListener("click", async () => {
-  if (!resultText.value) return;
   try {
     if (state.lastDownloadUrl) {
-      await downloadBlob(state.lastDownloadUrl, state.lastOutputFilename || `雏菊论文-${Date.now()}.docx`);
+      await downloadBlob(state.lastDownloadUrl, state.lastOutputFilename || `daisy-aigc-${Date.now()}.docx`);
+      return;
+    }
+    if (!resultText.value) {
+      showToast("请先点击提交并等待处理完成，生成结果后再导出。");
       return;
     }
     const blob = new Blob([resultText.value], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `雏菊论文-${Date.now()}.txt`;
+    link.download = `daisy-aigc-${Date.now()}.txt`;
     link.click();
     URL.revokeObjectURL(url);
   } catch (error) {
     showToast(error.message);
   }
 });
-
 function resetManualPayment() {
   paymentManual.hidden = true;
   paymentQrImage.hidden = true;

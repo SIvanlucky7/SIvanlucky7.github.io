@@ -1,4 +1,12 @@
 const nativeFetch = window.fetch.bind(window);
+const DAISY_KNOWN_API_BASES = [
+  "",
+  "https://daisy-aigc.vercel.app",
+  "https://daisy-aigc-api-proxy.western-pantydraco.workers.dev",
+  "https://daisy-aigc-api-proxy.billowy-waste.workers.dev",
+];
+const DAISY_NETWORK_TIMEOUT_MS = 15000;
+const DAISY_API_OVERRIDE_KEY = "daisy_api_base_url";
 
 function normalizeConfig(payload = {}) {
   const apiBaseUrl =
@@ -27,7 +35,7 @@ function normalizeConfig(payload = {}) {
 
 async function readJsonConfig(url) {
   try {
-    const response = await nativeFetch(url, { cache: "no-store" });
+    const response = await fetchWithTimeout(url, { cache: "no-store" }, DAISY_NETWORK_TIMEOUT_MS);
     if (!response.ok) return {};
     return await response.json();
   } catch {
@@ -35,15 +43,117 @@ async function readJsonConfig(url) {
   }
 }
 
+function uniqueApiBases(items) {
+  const seen = new Set();
+  return items
+    .map((item) => String(item || "").trim().replace(/\/+$/, ""))
+    .filter((item) => {
+      if (seen.has(item)) return false;
+      seen.add(item);
+      return true;
+    });
+}
+
+function fetchWithTimeout(url, init = {}, timeoutMs = DAISY_NETWORK_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  return nativeFetch(url, { ...init, signal: controller.signal }).finally(() => {
+    window.clearTimeout(timer);
+  });
+}
+
+function publicConfigUrl(apiBaseUrl) {
+  return apiBaseUrl ? `${apiBaseUrl}/api/public-config` : "/api/public-config";
+}
+
+function isNetworkFailure(error) {
+  const message = String(error?.message || error || "").toLowerCase();
+  return (
+    error?.name === "AbortError" ||
+    message.includes("failed to fetch") ||
+    message.includes("networkerror") ||
+    message.includes("load failed") ||
+    message.includes("network") ||
+    message.includes("fetch")
+  );
+}
+
 async function loadConfig() {
   const staticConfig = await readJsonConfig("/config.json");
   const staticNormalized = normalizeConfig(staticConfig);
-  const publicConfigUrl = staticNormalized.apiBaseUrl
-    ? `${staticNormalized.apiBaseUrl}/api/public-config`
-    : "/api/public-config";
-  const apiConfig = await readJsonConfig(publicConfigUrl);
+  const urlParams = new URLSearchParams(window.location.search);
+  const queryApiBase = urlParams.get("api") || "";
+  const resetApiBase = ["1", "true", "yes"].includes(String(urlParams.get("resetApi") || "").toLowerCase());
+  if (resetApiBase) {
+    try {
+      window.localStorage.removeItem(DAISY_API_OVERRIDE_KEY);
+    } catch {}
+  }
+  if (queryApiBase) {
+    try {
+      window.localStorage.setItem(DAISY_API_OVERRIDE_KEY, queryApiBase);
+    } catch {}
+  }
+  let storedApiBase = "";
+  if (!resetApiBase) {
+    try {
+      storedApiBase = window.localStorage.getItem(DAISY_API_OVERRIDE_KEY) || "";
+    } catch {}
+  }
+  const candidates = uniqueApiBases([queryApiBase, storedApiBase, staticNormalized.apiBaseUrl, ...DAISY_KNOWN_API_BASES]);
+  const attempts = [];
+  let apiConfig = {};
+  let selectedApiBaseUrl = staticNormalized.apiBaseUrl;
+
+  for (const candidate of candidates) {
+    const started = Date.now();
+    try {
+      const response = await fetchWithTimeout(publicConfigUrl(candidate), { cache: "no-store" }, DAISY_NETWORK_TIMEOUT_MS);
+      const text = await response.text();
+      let parsed = {};
+      try {
+        parsed = text ? JSON.parse(text) : {};
+      } catch {
+        parsed = {};
+      }
+      attempts.push({ apiBaseUrl: candidate || "(same-origin)", ok: response.ok, status: response.status, ms: Date.now() - started });
+      if (response.ok && parsed && typeof parsed === "object" && Object.keys(parsed).length > 0) {
+        apiConfig = parsed;
+        selectedApiBaseUrl = candidate;
+        break;
+      }
+    } catch (error) {
+      attempts.push({
+        apiBaseUrl: candidate || "(same-origin)",
+        ok: false,
+        error: error?.name === "AbortError" ? "timeout" : String(error?.message || error),
+        ms: Date.now() - started,
+      });
+    }
+  }
+
+  window.DaisyNetwork = {
+    attempts,
+    selectedApiBaseUrl: selectedApiBaseUrl || "(same-origin)",
+    candidates,
+    apiOverrideKey: DAISY_API_OVERRIDE_KEY,
+    setApiBaseUrl(value) {
+      const normalized = String(value || "").trim().replace(/\/+$/, "");
+      if (normalized) {
+        window.localStorage.setItem(DAISY_API_OVERRIDE_KEY, normalized);
+      } else {
+        window.localStorage.removeItem(DAISY_API_OVERRIDE_KEY);
+      }
+      window.location.reload();
+    },
+    clearApiBaseUrl() {
+      window.localStorage.removeItem(DAISY_API_OVERRIDE_KEY);
+      window.location.reload();
+    },
+  };
+
   return {
-    ...normalizeConfig({ ...staticConfig, ...apiConfig }),
+    ...normalizeConfig({ ...staticConfig, ...apiConfig, API_BASE_URL: selectedApiBaseUrl }),
     localAuthAvailable: Object.keys(apiConfig).length > 0,
   };
 }
@@ -62,8 +172,21 @@ function apiUrl(input) {
   return raw || input;
 }
 
-function apiRequestInfo(input) {
-  const raw = apiUrl(input);
+function apiUrlWithBase(input, apiBaseUrl = config.apiBaseUrl) {
+  const raw = typeof input === "string" ? input : input?.url || "";
+  const base = String(apiBaseUrl || "").trim().replace(/\/+$/, "");
+  if (!base) return raw || input;
+  try {
+    const url = new URL(raw, window.location.origin);
+    if (url.origin === window.location.origin && url.pathname.startsWith("/api/")) {
+      return `${base}${url.pathname}${url.search}${url.hash}`;
+    }
+  } catch {}
+  return raw || input;
+}
+
+function apiRequestInfo(input, apiBaseUrl = config.apiBaseUrl) {
+  const raw = apiUrlWithBase(input, apiBaseUrl);
   try {
     const url = new URL(raw, window.location.origin);
     return {
@@ -74,6 +197,38 @@ function apiRequestInfo(input) {
   } catch {
     return { isApi: false, sameOrigin: false, url: raw };
   }
+}
+
+async function probeApiBase(apiBaseUrl) {
+  const response = await fetchWithTimeout(publicConfigUrl(apiBaseUrl), { cache: "no-store" }, DAISY_NETWORK_TIMEOUT_MS);
+  if (!response.ok) return false;
+  const payload = await response.json().catch(() => ({}));
+  return Boolean(payload && typeof payload === "object" && Object.keys(payload).length);
+}
+
+async function switchToHealthyApiBase(excludeBase = config.apiBaseUrl) {
+  const candidates = window.DaisyNetwork?.candidates || DAISY_KNOWN_API_BASES;
+  for (const candidate of candidates) {
+    const normalized = String(candidate || "").trim().replace(/\/+$/, "");
+    if (normalized === String(excludeBase || "").trim().replace(/\/+$/, "")) continue;
+    try {
+      if (await probeApiBase(normalized)) {
+        try {
+          if (normalized) {
+            window.localStorage.setItem(DAISY_API_OVERRIDE_KEY, normalized);
+          } else {
+            window.localStorage.removeItem(DAISY_API_OVERRIDE_KEY);
+          }
+        } catch {}
+        if (window.DaisyNetwork) {
+          window.DaisyNetwork.selectedApiBaseUrl = normalized || "(same-origin)";
+          window.DaisyNetwork.pendingSwitch = normalized || "(same-origin)";
+        }
+        return normalized;
+      }
+    } catch {}
+  }
+  return null;
 }
 
 function authErrorMessage(error) {
@@ -166,7 +321,20 @@ async function apiFetch(input, init = {}) {
     headers.set("Authorization", `Bearer ${session.access_token}`);
   }
   const credentials = init.credentials || (config.apiBaseUrl && !request.sameOrigin ? "include" : "same-origin");
-  return nativeFetch(request.url, { ...init, credentials, headers });
+  const method = String(init.method || "GET").toUpperCase();
+  try {
+    return await nativeFetch(request.url, { ...init, credentials, headers });
+  } catch (error) {
+    if (!request.isApi || !isNetworkFailure(error)) throw error;
+    const fallbackBase = await switchToHealthyApiBase(config.apiBaseUrl);
+    if (!fallbackBase && fallbackBase !== "") throw error;
+    if (method === "GET" || method === "HEAD" || method === "OPTIONS") {
+      const fallbackRequest = apiRequestInfo(input, fallbackBase);
+      const fallbackCredentials = fallbackBase ? "include" : "same-origin";
+      return nativeFetch(fallbackRequest.url, { ...init, credentials: fallbackCredentials, headers });
+    }
+    throw new Error("网络入口已自动切换，请重新点击一次提交。系统没有重复提交当前订单。");
+  }
 }
 
 window.fetch = async (input, init = {}) => {
