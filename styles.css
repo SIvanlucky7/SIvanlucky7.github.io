@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   --ink: #1e2430;
   --muted: #667085;
   --line: #e8e4ea;
@@ -4145,7 +4145,7 @@ textarea {
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: transparent url("./assets/daisy-logo.png") center / contain no-repeat;
+  background: transparent url("./favicon.svg") center / contain no-repeat;
   box-shadow: none;
   transform: none;
 }
