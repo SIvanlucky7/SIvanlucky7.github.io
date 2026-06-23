@@ -1,6 +1,5 @@
 const nativeFetch = window.fetch.bind(window);
 const DAISY_KNOWN_API_BASES = [
-  "",
   "https://daisy-aigc.vercel.app",
   "https://daisy-aigc-api-proxy.western-pantydraco.workers.dev",
   "https://daisy-aigc-api-proxy.billowy-waste.workers.dev",
@@ -100,7 +99,16 @@ async function loadConfig() {
       storedApiBase = window.localStorage.getItem(DAISY_API_OVERRIDE_KEY) || "";
     } catch {}
   }
-  const candidates = uniqueApiBases([queryApiBase, storedApiBase, staticNormalized.apiBaseUrl, ...DAISY_KNOWN_API_BASES]);
+  const sameOriginCandidate = ["localhost", "127.0.0.1", "daisy-aigc.vercel.app"].includes(window.location.hostname)
+    ? ""
+    : null;
+  const candidates = uniqueApiBases([
+    queryApiBase,
+    storedApiBase,
+    staticNormalized.apiBaseUrl,
+    sameOriginCandidate,
+    ...DAISY_KNOWN_API_BASES,
+  ]);
   const attempts = [];
   let apiConfig = {};
   let selectedApiBaseUrl = staticNormalized.apiBaseUrl;
