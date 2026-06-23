@@ -103,9 +103,9 @@ async function loadConfig() {
     ? ""
     : null;
   const candidates = uniqueApiBases([
-    queryApiBase,
-    storedApiBase,
-    staticNormalized.apiBaseUrl,
+    queryApiBase || null,
+    storedApiBase || null,
+    staticNormalized.apiBaseUrl || null,
     sameOriginCandidate,
     ...DAISY_KNOWN_API_BASES,
   ]);
