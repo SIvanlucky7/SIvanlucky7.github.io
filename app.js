@@ -841,30 +841,7 @@ async function runOptimize(job) {
     } else {
       setResultEmpty("\u6b63\u5728\u964d\u4f4e AIGC", "\u6b63\u5728\u8c03\u7528 BypassAIGC \u5904\u7406\u6587\u4ef6\u5e76\u751f\u6210 Word\uff0c\u8bf7\u4e0d\u8981\u5173\u95ed\u9875\u9762\u3002", false);
     }
-    let payload = null;
-    if (job.inputType !== "text") {
-      payload = await runOptimizeInSteps(job);
-    }
-    if (!payload) {
-    const response = await authFetch("/api/optimize", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        service: job.service,
-        platform: job.platform,
-        language: job.language,
-        input_type: job.inputType,
-        source_filename: job.sourceFilename,
-        report_filename: job.reportFilename,
-        report_text: job.reportText,
-        source_file_base64: job.sourceFileBase64,
-        report_file_base64: job.reportFileBase64,
-        text: job.text,
-      }),
-    });
-    payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.error || "处理失败");
-    }
+    const payload = await runOptimizeInSteps(job);
     if (progressTimer) {
       window.clearInterval(progressTimer);
       progressTimer = null;
