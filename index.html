@@ -141,6 +141,10 @@
               <small>支持 .docx / .pdf / .txt · 最大 15MB · 完成后导出 Word</small>
               <input id="fileInput" type="file" accept=".txt,.docx,.pdf" />
             </div>
+            <div class="file-actions" id="sourceFileActions" hidden>
+              <button class="ghost" id="replaceSourceFileBtn" type="button"><i data-lucide="refresh-cw"></i>更换文件</button>
+              <button class="danger-inline" id="clearSourceFileBtn" type="button"><i data-lucide="x"></i>移除文件</button>
+            </div>
             <div class="report-upload-panel" id="reportUploadPanel" hidden>
               <div class="report-tip"><i data-lucide="circle-help"></i> 基于报告中标记的问题段落，针对性改写原文。</div>
               <label class="report-file-field">

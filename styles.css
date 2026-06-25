@@ -1396,6 +1396,43 @@ fieldset {
   cursor: pointer;
 }
 
+.file-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: -2px 0 14px;
+}
+
+.file-actions[hidden] {
+  display: none;
+}
+
+.file-actions button {
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 0 11px;
+  background: #fff;
+  color: var(--brand-dark);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.file-actions svg {
+  width: 15px;
+  height: 15px;
+}
+
+.file-actions .danger-inline {
+  color: #b4233c;
+  border-color: #ffd7df;
+  background: #fff5f7;
+}
+
 textarea {
   width: 100%;
   min-height: 322px;

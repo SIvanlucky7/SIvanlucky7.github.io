@@ -54,6 +54,9 @@ const clearResultBtn = document.querySelector("#clearResultBtn");
 const dropZone = document.querySelector("#dropZone");
 const fileInput = document.querySelector("#fileInput");
 const dropZoneLabel = dropZone?.querySelector("span");
+const sourceFileActions = document.querySelector("#sourceFileActions");
+const replaceSourceFileBtn = document.querySelector("#replaceSourceFileBtn");
+const clearSourceFileBtn = document.querySelector("#clearSourceFileBtn");
 const reportUploadPanel = document.querySelector("#reportUploadPanel");
 const reportFileInput = document.querySelector("#reportFileInput");
 const originalFileInput = document.querySelector("#originalFileInput");
@@ -400,6 +403,30 @@ sampleBtn.addEventListener("click", () => {
   updatePrice();
 });
 
+function updateSourceFileActions() {
+  if (!sourceFileActions) return;
+  sourceFileActions.hidden = !state.sourceFileName;
+}
+
+function resetSourceFile({ showToastMessage = false } = {}) {
+  sourceText.value = "";
+  state.sourceFileName = "";
+  state.sourceFileBase64 = "";
+  state.sourceFileChars = 0;
+  state.lastDownloadUrl = "";
+  state.lastOutputFilename = "";
+  resultText.value = "";
+  if (state.input === "file") {
+    resultText.hidden = true;
+    setResultEmpty("上传文件并点击提交开始处理", "处理结果将在这里显示", false);
+  }
+  if (fileInput) fileInput.value = "";
+  if (dropZoneLabel) dropZoneLabel.textContent = "将文件拖到此处，或点击上传";
+  updateSourceFileActions();
+  updatePrice();
+  if (showToastMessage) showToast("已移除当前文件，可以重新上传。");
+}
+
 async function handleSourceFile(file) {
   if (!file) return;
   await extractFileToText(file, {
@@ -414,21 +441,33 @@ async function handleSourceFile(file) {
       resultText.value = "";
       resultText.hidden = true;
       if (dropZoneLabel) dropZoneLabel.textContent = `${file.name} · ${payload.chars} 字 · 提交后导出 Word`;
+      updateSourceFileActions();
       setResultEmpty("\u6587\u4ef6\u5df2\u8bfb\u53d6\uff0c\u7b49\u5f85\u63d0\u4ea4", "\u8fd8\u6ca1\u6709\u5f00\u59cb\u964d\u4f4e AIGC\u3002\u8bf7\u70b9\u51fb\u4e2d\u95f4\u7684\u63d0\u4ea4\u6309\u94ae\uff0c\u7136\u540e\u5728\u5f39\u7a97\u91cc\u70b9\u51fb\u786e\u8ba4\u5e76\u5904\u7406\u3002", false);
       showToast(`已选择 ${file.name}，识别到 ${payload.chars} 字，提交后将输出 Word 文档`);
     },
     onError: () => {
-      sourceText.value = "";
-      state.sourceFileName = "";
-      state.sourceFileBase64 = "";
-      state.sourceFileChars = 0;
-      if (dropZoneLabel) dropZoneLabel.textContent = "将文件拖到此处，或点击上传";
+      resetSourceFile();
     },
   });
 }
 
 fileInput.addEventListener("change", async () => {
   await handleSourceFile(fileInput.files?.[0]);
+});
+
+replaceSourceFileBtn?.addEventListener("click", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  if (fileInput) {
+    fileInput.value = "";
+    fileInput.click();
+  }
+});
+
+clearSourceFileBtn?.addEventListener("click", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  resetSourceFile({ showToastMessage: true });
 });
 
 function fileToBase64(file) {
@@ -485,11 +524,9 @@ function updateInputMode() {
     originalFileName.textContent = "点击或拖拽上传原文文件";
   }
   if (state.input !== "file") {
-    state.sourceFileName = "";
-    state.sourceFileBase64 = "";
-    state.sourceFileChars = 0;
-    if (dropZoneLabel) dropZoneLabel.textContent = "将文件拖到此处，或点击上传";
+    resetSourceFile();
   }
+  updateSourceFileActions();
   updatePrice();
   createIconsSafe();
 }
