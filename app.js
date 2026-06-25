@@ -1769,11 +1769,11 @@ const helpSections = {
     subtitle: "订单、退款、人工精修和授权问题都可以联系运营人员。",
     html: `
       <div class="help-grid">
-        <article><strong>客服邮箱</strong><span>service@daisy-aigc.local</span></article>
+        <article><strong>客服邮箱</strong><span>1132360248@qq.com</span></article>
         <article><strong>工作时间</strong><span>工作日 09:30-18:30</span></article>
         <article><strong>咨询订单</strong><span>请提供订单号和账号邮箱</span></article>
       </div>
-      <p>正式上线前请替换为真实企业邮箱、客服电话、企业微信或工单系统入口。</p>
+      <p>请通过客服邮箱提交账号、订单、付款凭证和处理结果问题；企业主体和备案信息会在备案完成后补充展示。</p>
       <a class="help-link" href="./contact.html">查看完整联系信息</a>
     `,
   },
